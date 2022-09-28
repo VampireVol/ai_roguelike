@@ -48,6 +48,67 @@ static void add_attack_sm(flecs::entity entity)
   });
 }
 
+static void add_berserk_sm(flecs::entity entity)
+{
+  entity.get([](StateMachine &sm)
+  {
+    int patrol = sm.addState(create_patrol_state(3.f));
+    int moveToEnemy = sm.addState(create_move_to_enemy_state());
+
+    sm.addTransition(create_enemy_available_transition(3.f), patrol, moveToEnemy);
+    sm.addTransition(create_and_transition(create_negate_transition(create_hitpoints_less_than_transition(60.f)),
+                     create_negate_transition(create_enemy_available_transition(5.f))), moveToEnemy, patrol);
+  });
+}
+
+static void add_monster_healer_sm(flecs::entity entity)
+{
+  entity.get([](StateMachine& sm)
+  {
+    int patrol = sm.addState(create_patrol_state(3.f));
+    int heal = sm.addState(create_heal_state());
+    int moveToEnemy = sm.addState(create_move_to_enemy_state());
+    int fleeFromEnemy = sm.addState(create_flee_from_enemy_state());
+
+    sm.addTransition(create_and_transition(create_hitpoints_less_than_transition(50.f), create_have_potion_transition()), patrol, heal);
+    sm.addTransition(create_negate_transition(create_enemy_available_transition(5.f)), heal, patrol);
+
+    sm.addTransition(create_and_transition(create_hitpoints_less_than_transition(50.f), create_have_potion_transition()), moveToEnemy, heal);
+    sm.addTransition(create_enemy_available_transition(3.f), heal, moveToEnemy);
+
+    sm.addTransition(create_enemy_available_transition(3.f), patrol, moveToEnemy);
+    sm.addTransition(create_negate_transition(create_enemy_available_transition(5.f)), moveToEnemy, patrol);
+
+    sm.addTransition(create_and_transition(create_hitpoints_less_than_transition(60.f), create_enemy_available_transition(5.f)),
+      moveToEnemy, fleeFromEnemy);
+    sm.addTransition(create_and_transition(create_hitpoints_less_than_transition(60.f), create_enemy_available_transition(3.f)),
+      patrol, fleeFromEnemy);
+
+    sm.addTransition(create_negate_transition(create_enemy_available_transition(7.f)), fleeFromEnemy, patrol);
+  });
+}
+
+static void add_guard_sm(flecs::entity entity)
+{
+  entity.get([](StateMachine& sm)
+  {
+    int patrolPlayer = sm.addState(create_patrol_player_state(3.f));
+    int moveToEnemy = sm.addState(create_move_to_enemy_state());
+    int healPlayer = sm.addState(create_heal_player_state());
+
+    sm.addTransition(create_and_transition(
+      create_and_transition(create_player_hitpoints_less_than_transition(50.f), create_player_available_transition(2.f)),
+      create_is_heal_spell_ready_transition()), patrolPlayer, healPlayer);
+    sm.addTransition(create_negate_transition(create_enemy_available_transition(3.f)), healPlayer, patrolPlayer);
+
+    sm.addTransition(create_and_transition(create_and_transition(create_player_hitpoints_less_than_transition(50.f), create_player_available_transition(2.f)), create_is_heal_spell_ready_transition()), moveToEnemy, healPlayer);
+    sm.addTransition(create_enemy_available_transition(3.f), healPlayer, moveToEnemy);
+
+    sm.addTransition(create_enemy_available_transition(3.f), patrolPlayer, moveToEnemy);
+    sm.addTransition(create_negate_transition(create_enemy_available_transition(5.f)), moveToEnemy, patrolPlayer);
+  });
+}
+
 static flecs::entity create_monster(flecs::world &ecs, int x, int y, uint32_t color)
 {
   return ecs.entity()
@@ -60,7 +121,27 @@ static flecs::entity create_monster(flecs::world &ecs, int x, int y, uint32_t co
     .set(StateMachine{})
     .set(Team{1})
     .set(NumActions{1, 0})
-    .set(MeleeDamage{20.f});
+    .set(MeleeDamage{15.f});
+}
+
+static flecs::entity create_monster_with_potion(flecs::world& ecs, int x, int y)
+{
+  return create_monster(ecs, x, y, 0xff0cd3ed).set(HealPotion{20.f, 3});
+}
+
+static flecs::entity create_guard(flecs::world &ecs, int x, int y)
+{
+  return ecs.entity()
+    .set(Position{x, y})
+    .set(MovePos{x, y})
+    .set(Hitpoints{120.0f})
+    .set(Action{EA_NOP})
+    .set(Color{0xffff0000})
+    .set(Team{0})
+    .set(NumActions{1, 0})
+    .set(StateMachine{})
+    .set(MeleeDamage{30.f})
+    .set(HealSpell{50.f, 0, 10});
 }
 
 static void create_player(flecs::world &ecs, int x, int y)
@@ -75,7 +156,7 @@ static void create_player(flecs::world &ecs, int x, int y)
     .set(Team{0})
     .set(PlayerInput{})
     .set(NumActions{2, 0})
-    .set(MeleeDamage{50.f});
+    .set(MeleeDamage{30.f});
 }
 
 static void create_heal(flecs::world &ecs, int x, int y, float amount)
@@ -133,11 +214,16 @@ static void register_roguelike_systems(flecs::world &ecs)
 void init_roguelike(flecs::world &ecs)
 {
   register_roguelike_systems(ecs);
+  ecs.entity().set(Turn{0});
 
-  add_patrol_attack_flee_sm(create_monster(ecs, 5, 5, 0xffee00ee));
-  add_patrol_attack_flee_sm(create_monster(ecs, 10, -5, 0xffee00ee));
+  //add_patrol_attack_flee_sm(create_monster(ecs, 5, 5, 0xffee00ee));
+  //add_patrol_attack_flee_sm(create_monster(ecs, 10, -5, 0xffee00ee));
   add_patrol_flee_sm(create_monster(ecs, -5, -5, 0xff111111));
   add_attack_sm(create_monster(ecs, -5, 5, 0xff00ff00));
+  add_berserk_sm(create_monster(ecs, 4, 4, 0xff1111ff));
+
+  add_monster_healer_sm(create_monster_with_potion(ecs, -4, -4));
+  add_guard_sm(create_guard(ecs, 1, 1));
 
   create_player(ecs, 0, 0);
 
@@ -260,6 +346,11 @@ void process_turn(flecs::world &ecs)
   static auto stateMachineAct = ecs.query<StateMachine>();
   if (is_player_acted(ecs))
   {
+    static auto turn = ecs.query<Turn>();
+    turn.each([&](flecs::entity entity, Turn &turn)
+    {
+      turn.turn++;
+    });
     if (upd_player_actions_count(ecs))
     {
       // Plan action for NPCs
@@ -279,10 +370,16 @@ void print_stats(flecs::world &ecs)
 {
   bgfx::dbgTextClear();
   static auto playerStatsQuery = ecs.query<const IsPlayer, const Hitpoints, const MeleeDamage>();
+  static auto monsterWithPotion = ecs.query<const Hitpoints, const HealPotion>();
   playerStatsQuery.each([&](const IsPlayer &, const Hitpoints &hp, const MeleeDamage &dmg)
   {
     bgfx::dbgTextPrintf(0, 1, 0x0f, "hp: %d", (int)hp.hitpoints);
     bgfx::dbgTextPrintf(0, 2, 0x0f, "power: %d", (int)dmg.damage);
+  });
+  monsterWithPotion.each([&](const Hitpoints &hp, const HealPotion &potion)
+  {
+    bgfx::dbgTextPrintf(0, 4, 0x0f, "monster hp: %d", (int)hp.hitpoints);
+    bgfx::dbgTextPrintf(0, 5, 0x0f, "potion count: %d", (int)potion.count);
   });
 }
 

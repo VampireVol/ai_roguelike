@@ -89,6 +89,29 @@ struct PowerupAmount
   float amount = 0.f;
 };
 
+struct HealPotion
+{
+  float amount = 10.f;
+  int count = 0;
+};
+
+struct HealCooldown
+{
+  int cooldown = 0;
+};
+
+struct CurHealCooldown
+{
+  int curCooldown = 0;
+};
+
+struct HealSpell
+{
+  float amount = 50.f;
+  int lastUse = 0;
+  int cooldown = 10;
+};
+
 struct PlayerInput
 {
   bool left = false;
@@ -112,5 +135,10 @@ struct IsPlayer {};
 struct Team
 {
   int team = 0;
+};
+
+struct Turn
+{
+  int turn = 0;
 };
 

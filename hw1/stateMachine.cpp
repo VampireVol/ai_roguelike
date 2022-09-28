@@ -13,6 +13,14 @@ StateMachine::~StateMachine()
 
 void StateMachine::act(float dt, flecs::world &ecs, flecs::entity entity)
 {
+  /*if (!state)
+  {
+    states[curStateIdx]->act(dt, ecs, entity);
+  }
+  else
+  {
+
+  }*/
   if (curStateIdx < states.size())
   {
     for (const std::pair<StateTransition*, int> &transition : transitions[curStateIdx])

@@ -118,6 +118,72 @@ public:
   }
 };
 
+class HealState : public State
+{
+public:
+  void enter() const override {}
+  void exit() const override {}
+  void act(float/* dt*/, flecs::world &ecs, flecs::entity entity) const override
+  {
+    entity.set([&](Hitpoints &hp, HealPotion &potion)
+    {
+      hp.hitpoints += potion.amount;
+      potion.count--;
+    });
+  }
+};
+
+class HealPlayerState : public State
+{
+public:
+  void enter() const override {}
+  void exit() const override {}
+  void act(float/* dt*/, flecs::world &ecs, flecs::entity entity) const override
+  {
+    static auto turn = ecs.query<const Turn>();
+    static auto player = ecs.query<const IsPlayer, Hitpoints>();
+    entity.set([&](HealSpell& hs)
+    {
+      turn.each([&](const Turn& turn)
+      {
+        hs.lastUse = turn.turn;
+      });
+      player.each([&](const IsPlayer&, Hitpoints& hp)
+      {
+        hp.hitpoints = hs.amount;
+      });
+    });    
+  }
+};
+
+class PatrolPlayerState : public State
+{
+  float patrolDist;
+public:
+  PatrolPlayerState(float dist) : patrolDist(dist) {}
+  void enter() const override {}
+  void exit() const override {}
+  void act(float/* dt*/, flecs::world& ecs, flecs::entity entity) const override
+  {
+    static auto player = ecs.query<const IsPlayer, const Position>();
+    entity.set([&](const Position& pos, PatrolPos& ppos, Action& a)
+    {
+      player.each([&](const IsPlayer&, const Position& playerPos)
+      {
+        ppos.x = playerPos.x;
+        ppos.y = playerPos.y;
+      });
+      if (dist(pos, ppos) > patrolDist)
+        a.action = move_towards(pos, ppos); // do a recovery walk
+      else
+      {
+        // do a random walk
+        a.action = EA_MOVE_START + (rng.gen() % (EA_MOVE_END - EA_MOVE_START));
+      }
+    });
+  }
+};
+
 class NopState : public State
 {
 public:
@@ -149,6 +215,27 @@ public:
   }
 };
 
+class PlayerAvailableTransition : public StateTransition
+{
+  float triggerDist;
+public:
+  PlayerAvailableTransition(float in_dist) : triggerDist(in_dist) {}
+  bool isAvailable(flecs::world& ecs, flecs::entity entity) const override
+  {
+    static auto player = ecs.query<const IsPlayer, const Position>();
+    bool playerFound = false;
+    entity.get([&](const Position& pos, const Team& t)
+    {
+      player.each([&](flecs::entity player, const IsPlayer&, const Position& ppos)
+      {
+        float curDist = dist(ppos, pos);
+        playerFound |= curDist <= triggerDist;
+      });
+    });
+    return playerFound;
+  }
+};
+
 class HitpointsLessThanTransition : public StateTransition
 {
   float threshold;
@@ -162,6 +249,55 @@ public:
       hitpointsThresholdReached |= hp.hitpoints < threshold;
     });
     return hitpointsThresholdReached;
+  }
+};
+
+class PlayerHitpointsLessThenTransition : public StateTransition
+{
+  float threshold;
+public:
+  PlayerHitpointsLessThenTransition(float in_thres) : threshold(in_thres) {}
+  bool isAvailable(flecs::world& ecs, flecs::entity entity) const override
+  {
+    static auto player = ecs.query<const IsPlayer, const Hitpoints>();
+    bool hitpointsThresholdReached = false;
+    player.each([&](const IsPlayer, const Hitpoints &hp)
+    {
+        hitpointsThresholdReached |= hp.hitpoints < threshold;
+    });
+    return hitpointsThresholdReached;
+  }
+};
+
+class IsHealSpellReady : public StateTransition
+{
+public:
+  bool isAvailable(flecs::world& ecs, flecs::entity entity) const override
+  {
+    static auto turn = ecs.query<const Turn>();
+    bool spellReady = false;
+    entity.get([&](const HealSpell &hs)
+    {
+      turn.each([&](const Turn &turn)
+      {
+        spellReady |= hs.lastUse < 1 || (turn.turn - hs.lastUse >= hs.cooldown);
+      });
+    });
+    return spellReady;
+  }
+};
+
+class HavePotionTransition : public StateTransition
+{
+public:
+  bool isAvailable(flecs::world& ecs, flecs::entity entity) const override
+  {
+    bool havePotion = false;
+    entity.get([&](const HealPotion& potion)
+    {
+        havePotion |= potion.count > 0;
+    });
+    return havePotion;
   }
 };
 
@@ -221,6 +357,10 @@ State *create_flee_from_enemy_state()
   return new FleeFromEnemyState();
 }
 
+State *create_heal_state()
+{
+  return new HealState();
+}
 
 State *create_patrol_state(float patrol_dist)
 {
@@ -232,10 +372,25 @@ State *create_nop_state()
   return new NopState();
 }
 
+State *create_patrol_player_state(float dist)
+{
+  return new PatrolPlayerState(dist);
+}
+
+State *create_heal_player_state()
+{
+  return new HealPlayerState();
+}
+
 // transitions
 StateTransition *create_enemy_available_transition(float dist)
 {
   return new EnemyAvailableTransition(dist);
+}
+
+StateTransition *create_player_available_transition(float dist)
+{
+  return new PlayerAvailableTransition(dist);
 }
 
 StateTransition *create_enemy_reachable_transition()
@@ -246,6 +401,21 @@ StateTransition *create_enemy_reachable_transition()
 StateTransition *create_hitpoints_less_than_transition(float thres)
 {
   return new HitpointsLessThanTransition(thres);
+}
+
+StateTransition *create_player_hitpoints_less_than_transition(float thres)
+{
+  return new PlayerHitpointsLessThenTransition(thres);
+}
+
+StateTransition *create_is_heal_spell_ready_transition()
+{
+  return new IsHealSpellReady();
+}
+
+StateTransition *create_have_potion_transition()
+{
+  return new HavePotionTransition();
 }
 
 StateTransition *create_negate_transition(StateTransition *in)
