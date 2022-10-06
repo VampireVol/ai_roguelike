@@ -1,4 +1,17 @@
-# How build with Visual Studio
+# How build for w2 and hw2 with Visual Studio
+1. Clone 3rdParty submodules
+```
+git submodule init
+git submodule update
+```
+2. Build raylib
+```
+cd 3rdParty/raylib/cmake
+cmake ../
+```
+
+
+# How build for w1 and hw1 with Visual Studio
 1. Clone 3rdParty submodules
 ```
 git submodule init
