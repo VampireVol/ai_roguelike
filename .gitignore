@@ -53,3 +53,10 @@ Debug/
 *.vcxproj.*
 *.iobj
 *.ipdb
+
+# Cmake
+Makefile
+CMakeFiles
+CMakeCache.txt
+*.cmake
+compile_commands.json

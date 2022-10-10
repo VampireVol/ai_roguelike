@@ -16,17 +16,26 @@ static void update_camera(Camera2D &cam, flecs::world &ecs)
   });
 }
 
-int main(int argc, const char **argv)
+int main(int /*argc*/, const char ** /*argv*/)
 {
   int width = 1920;
   int height = 1080;
   InitWindow(width, height, "w2 AI MIPT");
 
+  const int scrWidth = GetMonitorWidth(0);
+  const int scrHeight = GetMonitorHeight(0);
+  if (scrWidth < width || scrHeight < height)
+  {
+    width = std::min(scrWidth, width);
+    height = std::min(scrHeight, height);
+    SetWindowSize(width, height);
+  }
+
   flecs::world ecs;
 
   init_roguelike(ecs);
 
-  Camera2D camera = { 0 };
+  Camera2D camera = { {0, 0}, {0, 0}, 0.f, 1.f };
   camera.target = Vector2{ 0.f, 0.f };
   camera.offset = Vector2{ width * 0.5f, height * 0.5f };
   camera.rotation = 0.f;

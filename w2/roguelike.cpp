@@ -13,12 +13,12 @@ static void create_minotaur_beh(flecs::entity e)
     selector({
       sequence({
         is_low_hp(50.f),
-        find_enemy(e, 4.f, "enemy"),
-        flee(e, "enemy")
+        find_enemy(e, 4.f, "flee_enemy"),
+        flee(e, "flee_enemy")
       }),
       sequence({
-        find_enemy(e, 3.f, "enemy"),
-        move_to_entity(e, "enemy")
+        find_enemy(e, 3.f, "attack_enemy"),
+        move_to_entity(e, "attack_enemy")
       }),
       patrol(e, 2.f, "patrol_pos")
     });
@@ -31,7 +31,6 @@ static flecs::entity create_monster(flecs::world &ecs, int x, int y, Color col, 
   return ecs.entity()
     .set(Position{x, y})
     .set(MovePos{x, y})
-    .set(PatrolPos{x, y})
     .set(Hitpoints{100.f})
     .set(Action{EA_NOP})
     .set(Color{col})
@@ -103,7 +102,7 @@ static void register_roguelike_systems(flecs::world &ecs)
     .term<TextureSource>(flecs::Wildcard).not_()
     .each([&](const Position &pos, const Color color)
     {
-      const Rectangle rect = {(float)pos.x, (float)pos.y, 1, 1};
+      const Rectangle rect = {float(pos.x), float(pos.y), 1, 1};
       DrawRectangleRec(rect, color);
     });
   ecs.system<const Position, const Color>()
@@ -113,7 +112,7 @@ static void register_roguelike_systems(flecs::world &ecs)
       const auto textureSrc = e.target<TextureSource>();
       DrawTextureQuad(*textureSrc.get<Texture2D>(),
           Vector2{1, 1}, Vector2{0, 0},
-          Rectangle{(float)pos.x, (float)pos.y, 1, 1}, color);
+          Rectangle{float(pos.x), float(pos.y), 1, 1}, color);
     });
 }
 
@@ -135,9 +134,9 @@ void init_roguelike(flecs::world &ecs)
       });
 
   create_minotaur_beh(create_monster(ecs, 5, 5, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
-  create_monster(ecs, 10, -5, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex");
-  create_monster(ecs, -5, -5, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex");
-  create_monster(ecs, -5, 5, Color{0, 255, 0, 255}, "minotaur_tex");
+  create_minotaur_beh(create_monster(ecs, 10, -5, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
+  create_minotaur_beh(create_monster(ecs, -5, -5, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
+  create_minotaur_beh(create_monster(ecs, -5, 5, Color{0, 255, 0, 255}, "minotaur_tex"));
 
   create_player(ecs, 0, 0, "swordsman_tex");
 
@@ -211,7 +210,7 @@ static void process_actions(flecs::world &ecs)
         mpos = nextPos;
     });
     // now move
-    processActions.each([&](flecs::entity entity, Action &a, Position &pos, MovePos &mpos, const MeleeDamage &, const Team&)
+    processActions.each([&](Action &a, Position &pos, MovePos &mpos, const MeleeDamage &, const Team&)
     {
       pos = mpos;
       a.action = EA_NOP;
@@ -285,8 +284,8 @@ void print_stats(flecs::world &ecs)
   static auto playerStatsQuery = ecs.query<const IsPlayer, const Hitpoints, const MeleeDamage>();
   playerStatsQuery.each([&](const IsPlayer &, const Hitpoints &hp, const MeleeDamage &dmg)
   {
-    DrawText(TextFormat("hp: %d", (int)hp.hitpoints), 20, 20, 20, WHITE);
-    DrawText(TextFormat("power: %d", (int)dmg.damage), 20, 40, 20, WHITE);
+    DrawText(TextFormat("hp: %d", int(hp.hitpoints)), 20, 20, 20, WHITE);
+    DrawText(TextFormat("power: %d", int(dmg.damage)), 20, 40, 20, WHITE);
   });
 }
 
