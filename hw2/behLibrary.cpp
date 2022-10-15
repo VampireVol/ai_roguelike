@@ -37,6 +37,56 @@ struct Sequence : public CompoundNode
   }
 };
 
+struct Or : public CompoundNode
+{
+  BehResult update(flecs::world &ecs, flecs::entity entity, Blackboard &bb) override
+  {
+    for (BehNode *node : nodes)
+    {
+      BehResult res = node->update(ecs, entity, bb);
+      if (res == BEH_SUCCESS)
+        return res;
+      if (res == BEH_RUNNING)
+        return res;
+    }
+    return BEH_FAIL;
+  }
+};
+
+struct Parallel : public CompoundNode
+{
+  BehResult update(flecs::world &ecs, flecs::entity entity, Blackboard &bb) override
+  {
+    for (BehNode *node : nodes)
+    {
+      BehResult res = node->update(ecs, entity, bb);
+      if (res == BEH_SUCCESS)
+        return BEH_SUCCESS;
+      if (res == BEH_FAIL)
+        return BEH_FAIL;
+    }
+    return BEH_RUNNING;
+  }
+};
+
+struct Not : public BehNode
+{
+  std::unique_ptr<BehNode> node;
+
+  Not(BehNode *node) : node(node) {}
+
+  BehResult update(flecs::world& ecs, flecs::entity entity, Blackboard& bb) override
+  {
+    BehResult res = node->update(ecs, entity, bb);
+    if (res == BEH_SUCCESS)
+      return BEH_FAIL;
+    if (res == BEH_FAIL)
+      return BEH_SUCCESS;
+    assert(res != BEH_RUNNING);
+    return BEH_FAIL;
+  }
+};
+
 struct Selector : public CompoundNode
 {
   BehResult update(flecs::world &ecs, flecs::entity entity, Blackboard &bb) override
@@ -212,6 +262,27 @@ BehNode *selector(const std::vector<BehNode*> &nodes)
   for (BehNode *node : nodes)
     sel->pushNode(node);
   return sel;
+}
+
+BehNode *or_node(const std::vector<BehNode*> &nodes)
+{
+  Or *orNode = new Or;
+  for (BehNode *node : nodes)
+    orNode->pushNode(node);
+  return orNode;
+}
+
+BehNode *parallel(const std::vector<BehNode*> &nodes)
+{
+  Parallel *parallel = new Parallel;
+  for (BehNode *node : nodes)
+    parallel->pushNode(node);
+  return parallel;
+}
+
+BehNode *not_node(BehNode *node)
+{
+  return new Not(node);  
 }
 
 BehNode *move_to_entity(flecs::entity entity, const char *bb_name)
