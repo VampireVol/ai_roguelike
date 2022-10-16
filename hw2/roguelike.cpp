@@ -8,7 +8,6 @@
 
 static void create_minotaur_beh(flecs::entity e)
 {
-  e.set(Blackboard{});
   BehNode *root =
     selector({
       sequence({
@@ -27,7 +26,6 @@ static void create_minotaur_beh(flecs::entity e)
 
 static void create_pickup_monster(flecs::entity e)
 {
-  e.set(Blackboard{});
   e.add<CanPickUp>();
   BehNode *root =
     selector({
@@ -61,6 +59,56 @@ static flecs::entity create_monster(flecs::world &ecs, int x, int y, Color col, 
     .set(NumActions{1, 0})
     .set(MeleeDamage{20.f})
     .set(Blackboard{});
+}
+
+static flecs::entity create_guard(flecs::world &ecs, int x, int y, Color col, const char *texture_src)
+{
+  flecs::entity textureSrc = ecs.entity(texture_src);
+  flecs::entity waypoint1 = ecs.entity()
+    .set(Position{ 6, 6 });
+  flecs::entity waypoint2 = ecs.entity()
+    .set(Position{ -6, 6 })
+    .set(Waypoint{ waypoint1 });
+  flecs::entity waypoint3 = ecs.entity()
+    .set(Position{ -6, -6 })
+    .set(Waypoint{ waypoint2 });
+  flecs::entity waypoint4 = ecs.entity()
+    .set(Position{ 6, -6 })
+    .set(Waypoint{ waypoint3 });
+  waypoint1.set(Waypoint{ waypoint4 });
+
+  flecs::entity e = ecs.entity()
+    .set(Position{ x, y })
+    .set(MovePos{ x, y })
+    .set(Hitpoints{ 150.f })
+    .set(Action{ EA_NOP })
+    .set(Color{ col })
+    .add<TextureSource>(textureSrc)
+    .set(Team{ 0 })
+    .set(NumActions{ 1, 0 })
+    .set(MeleeDamage{ 40.f })
+    .set(Blackboard{})
+    .set(Waypoint{ waypoint1 })
+    .add<IsGuard>();
+
+  BehNode *root = 
+    selector({
+      sequence({
+        find_enemy(e, 2.f, "attack_enemy"),
+        move_to_entity(e, "attack_enemy")
+      }),
+      sequence({
+        check_waypoint(e, "waypoint_pos"),
+        move_to_entity(e, "waypoint_pos")
+      })
+    });
+  e.set([&](Blackboard &bb)
+  {
+    size_t waypointIdx = bb.regName<flecs::entity>("waypoint_pos");
+    bb.set<flecs::entity>(waypointIdx, waypoint1);
+  });
+
+  return e.set(BehaviourTree{root});
 }
 
 static void create_player(flecs::world &ecs, int x, int y, const char *texture_src)
@@ -156,10 +204,11 @@ void init_roguelike(flecs::world &ecs)
         UnloadTexture(texture);
       });
 
-  //create_minotaur_beh(create_monster(ecs, 5, 5, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
+  create_minotaur_beh(create_monster(ecs, 5, 5, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
   //create_minotaur_beh(create_monster(ecs, 10, -5, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
   create_pickup_monster(create_monster(ecs, -7, -7, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
   //create_minotaur_beh(create_monster(ecs, -5, 5, Color{0, 255, 0, 255}, "minotaur_tex"));
+  create_guard(ecs, 1, 1, Color{ 0x44, 0xaa, 0xff, 0xff }, "swordsman_tex");
 
   create_player(ecs, 0, 0, "swordsman_tex");
 
@@ -318,10 +367,16 @@ void process_turn(flecs::world &ecs)
 void print_stats(flecs::world &ecs)
 {
   static auto playerStatsQuery = ecs.query<const IsPlayer, const Hitpoints, const MeleeDamage>();
+  static auto guardStatsQuery = ecs.query<const IsGuard, const Hitpoints, const MeleeDamage>();
   playerStatsQuery.each([&](const IsPlayer &, const Hitpoints &hp, const MeleeDamage &dmg)
   {
     DrawText(TextFormat("hp: %d", int(hp.hitpoints)), 20, 20, 20, WHITE);
     DrawText(TextFormat("power: %d", int(dmg.damage)), 20, 40, 20, WHITE);
+  });
+  guardStatsQuery.each([&](const IsGuard &, const Hitpoints &hp, const MeleeDamage &dmg)
+  {
+    DrawText(TextFormat("guard hp: %d", int(hp.hitpoints)), 20, 60, 20, WHITE);
+    DrawText(TextFormat("guard power: %d", int(dmg.damage)), 20, 80, 20, WHITE);
   });
 }
 

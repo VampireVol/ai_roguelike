@@ -24,6 +24,7 @@ BehNode *parallel(const std::vector<BehNode*> &nodes);
 BehNode *not_node(BehNode *node);
 
 BehNode *move_to_entity(flecs::entity entity, const char *bb_name);
+BehNode *check_waypoint(flecs::entity entity, const char *bb_name);
 BehNode *is_low_hp(float thres);
 BehNode *find_enemy(flecs::entity entity, float dist, const char *bb_name);
 BehNode *find_pick_up(flecs::entity entity, const char *bb_name);

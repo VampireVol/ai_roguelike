@@ -223,6 +223,29 @@ struct FindPickUp : public BehNode
   }
 };
 
+struct CheckWaypoint : public BehNode
+{
+  size_t entityWaypointBb = size_t(-1);
+  CheckWaypoint(flecs::entity entity, const char *bb_name)
+    : entityWaypointBb(reg_entity_blackboard_var<flecs::entity>(entity, bb_name)) {}
+
+  BehResult update(flecs::world &, flecs::entity entity, Blackboard &bb) override
+  {
+    entity.set([&](const Position &pos)
+    {
+      flecs::entity waypoint = bb.get<flecs::entity>(entityWaypointBb);
+      waypoint.get([&](const Position &wpos, const Waypoint &nextWaypoint)
+      {
+        if (wpos == pos)
+        {
+          bb.set<flecs::entity>(entityWaypointBb, nextWaypoint.next);
+        }
+      });
+    });
+    return BEH_SUCCESS;
+  }
+};
+
 struct Flee : public BehNode
 {
   size_t entityBb = size_t(-1);
@@ -321,6 +344,11 @@ BehNode *not_node(BehNode *node)
 BehNode *move_to_entity(flecs::entity entity, const char *bb_name)
 {
   return new MoveToEntity(entity, bb_name);
+}
+
+BehNode *check_waypoint(flecs::entity entity, const char *bb_name)
+{
+  return new CheckWaypoint(entity, bb_name);
 }
 
 BehNode *is_low_hp(float thres)
