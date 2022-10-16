@@ -190,6 +190,43 @@ struct FindEnemy : public BehNode
   }
 };
 
+struct FindPickUp : public BehNode
+{
+  size_t nextPickUpBb = size_t(-1);
+  FindPickUp(flecs::entity entity, const char* bb_name)
+  {
+    nextPickUpBb = reg_entity_blackboard_var<flecs::entity>(entity, bb_name);
+  }
+
+  BehResult update(flecs::world &ecs, flecs::entity entity, Blackboard &bb) override
+  {
+    BehResult res = BEH_FAIL;
+    static auto pickUpQuery = ecs.query<const Position, const IsPickUp>();
+    entity.set([&](const Position &pos)
+    {
+      float closestDist = FLT_MAX;
+      Position closestPos;
+      flecs::entity closestPickUpEntity;
+      pickUpQuery.each([&](flecs::entity pickUpEntity, const Position &hpos, const IsPickUp &)
+      {
+        float curDist = dist(hpos, pos);
+        if (curDist < closestDist)
+        {
+          closestPos = hpos;
+          closestDist = curDist;
+          closestPickUpEntity = pickUpEntity;
+        }
+      });
+      if (closestDist < FLT_MAX)
+      {
+        bb.set<flecs::entity>(nextPickUpBb, closestPickUpEntity);
+        res = BEH_SUCCESS;
+      }
+    });
+    return res;
+  }
+};
+
 struct Flee : public BehNode
 {
   size_t entityBb = size_t(-1);
@@ -298,6 +335,11 @@ BehNode *is_low_hp(float thres)
 BehNode *find_enemy(flecs::entity entity, float dist, const char *bb_name)
 {
   return new FindEnemy(entity, dist, bb_name);
+}
+
+BehNode *find_pick_up(flecs::entity entity, const char *bb_name)
+{
+  return new FindPickUp(entity, bb_name);
 }
 
 BehNode *flee(flecs::entity entity, const char *bb_name)
