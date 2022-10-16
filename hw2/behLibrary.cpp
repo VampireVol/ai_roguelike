@@ -44,9 +44,7 @@ struct Or : public CompoundNode
     for (BehNode *node : nodes)
     {
       BehResult res = node->update(ecs, entity, bb);
-      if (res == BEH_SUCCESS)
-        return res;
-      if (res == BEH_RUNNING)
+      if (res != BEH_FAIL)
         return res;
     }
     return BEH_FAIL;
@@ -60,10 +58,8 @@ struct Parallel : public CompoundNode
     for (BehNode *node : nodes)
     {
       BehResult res = node->update(ecs, entity, bb);
-      if (res == BEH_SUCCESS)
-        return BEH_SUCCESS;
-      if (res == BEH_FAIL)
-        return BEH_FAIL;
+      if (res != BEH_RUNNING)
+        return res;
     }
     return BEH_RUNNING;
   }
