@@ -30,4 +30,6 @@ BehNode *find_enemy(flecs::entity entity, float dist, const char *bb_name);
 BehNode *find_pick_up(flecs::entity entity, const char *bb_name);
 BehNode *flee(flecs::entity entity, const char *bb_name);
 BehNode *patrol(flecs::entity entity, float patrol_dist, const char *bb_name);
+BehNode *roar(flecs::entity entity, float roar_dist, const char *bb_name, const char *bb_enemy);
+BehNode *react_roar(flecs::entity entity, const char *react_bb_name);
 

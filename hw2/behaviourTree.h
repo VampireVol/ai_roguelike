@@ -11,9 +11,16 @@ enum BehResult
   BEH_RUNNING
 };
 
+enum Reaction
+{
+  ROAR
+};
+
+
 struct BehNode
 {
   virtual ~BehNode() {}
+  virtual void react(Reaction reaction, Blackboard &bb) = 0;
   virtual BehResult update(flecs::world &ecs, flecs::entity entity, Blackboard &bb) = 0;
 };
 
@@ -35,6 +42,10 @@ struct BehaviourTree
   void update(flecs::world &ecs, flecs::entity entity, Blackboard &bb)
   {
     root->update(ecs, entity, bb);
+  }
+  void react(Reaction reaction, Blackboard &bb)
+  {
+    root->react(reaction, bb);
   }
 };
 

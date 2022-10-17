@@ -19,6 +19,10 @@ static void create_minotaur_beh(flecs::entity e)
         find_enemy(e, 3.f, "attack_enemy"),
         move_to_entity(e, "attack_enemy")
       }),
+      sequence({
+        react_roar(e, "react_roar"),
+        move_to_entity(e, "danger_enemy")
+      }),
       patrol(e, 2.f, "patrol_pos")
     });
   e.set(BehaviourTree{root});
@@ -41,6 +45,24 @@ static void create_pickup_monster(flecs::entity e)
         find_enemy(e, 200.f, "berserk_attack_enemy"),
         move_to_entity(e, "berserk_attack_enemy")
       })      
+    });
+  e.set(BehaviourTree{root});
+}
+
+static void create_roar_monster(flecs::entity e)
+{
+  BehNode *root = 
+    selector({
+      sequence({
+        find_enemy(e, 1.f, "roar_enemy"),
+        roar(e, 20.f, "roar_enemy", "danger_enemy"),
+        move_to_entity(e, "roar_enemy")
+      }),
+      sequence({
+        find_enemy(e, 3.f, "attack_enemy"),
+        move_to_entity(e, "attack_enemy")
+      }),
+      patrol(e, 2.f, "patrol_pos")
     });
   e.set(BehaviourTree{root});
 }
@@ -96,6 +118,10 @@ static flecs::entity create_guard(flecs::world &ecs, int x, int y, Color col, co
       sequence({
         find_enemy(e, 2.f, "attack_enemy"),
         move_to_entity(e, "attack_enemy")
+      }),
+      sequence({
+        react_roar(e, "react_roar"),
+        move_to_entity(e, "danger_enemy")
       }),
       sequence({
         check_waypoint(e, "waypoint_pos"),
@@ -204,10 +230,15 @@ void init_roguelike(flecs::world &ecs)
         UnloadTexture(texture);
       });
 
-  create_minotaur_beh(create_monster(ecs, 5, 5, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
+  //create_minotaur_beh(create_monster(ecs, 5, 5, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
   //create_minotaur_beh(create_monster(ecs, 10, -5, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
-  create_pickup_monster(create_monster(ecs, -7, -7, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
   //create_minotaur_beh(create_monster(ecs, -5, 5, Color{0, 255, 0, 255}, "minotaur_tex"));
+
+  create_pickup_monster(create_monster(ecs, -7, -7, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
+  create_roar_monster(create_monster(ecs, 8, 6, Color{0xff, 0x00, 0x00, 0xff}, "minotaur_tex"));
+  create_minotaur_beh(create_monster(ecs, 10, 6, Color{ 0xff, 0xff, 0xff, 0xff }, "minotaur_tex"));
+  create_minotaur_beh(create_monster(ecs, 12, 6, Color{ 0xff, 0xff, 0xff, 0xff }, "minotaur_tex"));
+  create_minotaur_beh(create_monster(ecs, 10, 0, Color{ 0xff, 0xff, 0xff, 0xff }, "minotaur_tex"));
   create_guard(ecs, 1, 1, Color{ 0x44, 0xaa, 0xff, 0xff }, "swordsman_tex");
 
   create_player(ecs, 0, 0, "swordsman_tex");
