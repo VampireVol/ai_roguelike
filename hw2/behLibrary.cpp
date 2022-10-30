@@ -17,17 +17,20 @@ struct CompoundNode : public BehNode
     nodes.clear();
   }
 
-  bool react(Reaction react, Blackboard &bb) override
+  bool react(Reaction react, Blackboard &bb, bool search_deeper) override
   {
+    if (!search_deeper)
+      return false;
+
     if (cached_idx > -1)
     {
-      if (nodes[cached_idx]->react(react, bb))
+      if (nodes[cached_idx]->react(react, bb, search_deeper))
         return true;
     }
 
     for (BehNode *node : nodes)
     {
-      if (node->react(react, bb))
+      if (node->react(react, bb, false))
         return true;
     }
     return false;
@@ -100,9 +103,9 @@ struct Not : public BehNode
 
   Not(BehNode *node) : node(node) {}
 
-  bool react(Reaction reaction, Blackboard &bb) override 
+  bool react(Reaction reaction, Blackboard &bb, bool search_deeper) override
   {
-    return node->react(reaction, bb);
+    return node->react(reaction, bb, search_deeper);
   }
 
   BehResult update(flecs::world& ecs, flecs::entity entity, Blackboard& bb) override
@@ -138,17 +141,8 @@ struct Selector : public CompoundNode
 struct MoveToEntity : public BehNode
 {
   size_t entityBb = size_t(-1); // wraps to 0xff...
-  bool ignoreRoar = false;
-  MoveToEntity(flecs::entity entity, const char *bb_name, bool ignore_roar)
+  MoveToEntity(flecs::entity entity, const char *bb_name)
     : entityBb(reg_entity_blackboard_var<flecs::entity>(entity, bb_name)) {}
-
-  bool react(Reaction reaction, Blackboard &bb) override 
-  {
-    if (reaction == ROAR)
-      return ignoreRoar;
-
-    return false;
-  }
 
   BehResult update(flecs::world &, flecs::entity entity, Blackboard &bb) override
   {
@@ -394,7 +388,7 @@ struct ReactRoar : public BehNode
   {
   }
 
-  bool react(Reaction reaction, Blackboard &bb) override
+  bool react(Reaction reaction, Blackboard &bb, bool search_deeper) override
   {
     if (reaction == ROAR)
     {
@@ -449,9 +443,9 @@ BehNode *not_node(BehNode *node)
   return new Not(node);  
 }
 
-BehNode *move_to_entity(flecs::entity entity, const char *bb_name, bool ignore_roar)
+BehNode *move_to_entity(flecs::entity entity, const char *bb_name)
 {
-  return new MoveToEntity(entity, bb_name, ignore_roar);
+  return new MoveToEntity(entity, bb_name);
 }
 
 BehNode *check_waypoint(flecs::entity entity, const char *bb_name)

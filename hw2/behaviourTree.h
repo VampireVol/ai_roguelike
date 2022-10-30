@@ -20,7 +20,7 @@ enum Reaction
 struct BehNode
 {
   virtual ~BehNode() {}
-  virtual bool react(Reaction reaction, Blackboard &bb)
+  virtual bool react(Reaction reaction, Blackboard &bb, bool search_deeper)
   {
     return false;
   }
@@ -48,7 +48,7 @@ struct BehaviourTree
   }
   void react(Reaction reaction, Blackboard &bb)
   {
-    root->react(reaction, bb);
+    root->react(reaction, bb, true);
   }
 };
 
