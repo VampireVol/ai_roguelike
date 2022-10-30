@@ -20,7 +20,10 @@ enum Reaction
 struct BehNode
 {
   virtual ~BehNode() {}
-  virtual void react(Reaction reaction, Blackboard &bb) = 0;
+  virtual bool react(Reaction reaction, Blackboard &bb)
+  {
+    return false;
+  }
   virtual BehResult update(flecs::world &ecs, flecs::entity entity, Blackboard &bb) = 0;
 };
 

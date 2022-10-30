@@ -17,13 +17,16 @@ static void create_minotaur_beh(flecs::entity e)
       }),
       sequence({
         find_enemy(e, 3.f, "attack_enemy"),
-        move_to_entity(e, "attack_enemy")
+        move_to_entity(e, "attack_enemy", true)
       }),
       sequence({
-        react_roar(e, "react_roar"),
-        move_to_entity(e, "danger_enemy")
+        move_to_entity(e, "danger_enemy", true)
       }),
-      patrol(e, 2.f, "patrol_pos")
+      sequence({
+        react_roar(e, "danger_enemy_payload", "danger_enemy"),
+        patrol(e, 2.f, "patrol_pos")
+      }),
+      
     });
   e.set(BehaviourTree{root});
 }
@@ -35,15 +38,15 @@ static void create_pickup_monster(flecs::entity e)
     selector({
       sequence({
         find_enemy(e, 2.f, "attack_enemy"),
-        move_to_entity(e, "attack_enemy")
+        move_to_entity(e, "attack_enemy", true)
       }),
       sequence({
         find_pick_up(e, "next_pick_up"),
-        move_to_entity(e, "next_pick_up")
+        move_to_entity(e, "next_pick_up", true)
       }),
       sequence({
         find_enemy(e, 200.f, "berserk_attack_enemy"),
-        move_to_entity(e, "berserk_attack_enemy")
+        move_to_entity(e, "berserk_attack_enemy", true)
       })      
     });
   e.set(BehaviourTree{root});
@@ -55,12 +58,12 @@ static void create_roar_monster(flecs::entity e)
     selector({
       sequence({
         find_enemy(e, 1.f, "roar_enemy"),
-        roar(e, 20.f, "roar_enemy", "danger_enemy"),
-        move_to_entity(e, "roar_enemy")
+        roar(e, 20.f, "roar_enemy", "danger_enemy_payload"),
+        move_to_entity(e, "roar_enemy", true)
       }),
       sequence({
         find_enemy(e, 3.f, "attack_enemy"),
-        move_to_entity(e, "attack_enemy")
+        move_to_entity(e, "attack_enemy", true)
       }),
       patrol(e, 2.f, "patrol_pos")
     });
@@ -117,15 +120,15 @@ static flecs::entity create_guard(flecs::world &ecs, int x, int y, Color col, co
     selector({
       sequence({
         find_enemy(e, 2.f, "attack_enemy"),
-        move_to_entity(e, "attack_enemy")
+        move_to_entity(e, "attack_enemy", true)
       }),
       sequence({
-        react_roar(e, "react_roar"),
-        move_to_entity(e, "danger_enemy")
+        move_to_entity(e, "friendly_help", true)
       }),
       sequence({
+        react_roar(e, "danger_enemy_payload", "friendly_help"),
         check_waypoint(e, "waypoint_pos"),
-        move_to_entity(e, "waypoint_pos")
+        move_to_entity(e, "waypoint_pos", false)
       })
     });
   e.set([&](Blackboard &bb)

@@ -17,12 +17,20 @@ struct CompoundNode : public BehNode
     nodes.clear();
   }
 
-  void react(Reaction react, Blackboard &bb) override
+  bool react(Reaction react, Blackboard &bb) override
   {
+    if (cached_idx > -1)
+    {
+      if (nodes[cached_idx]->react(react, bb))
+        return true;
+    }
+
     for (BehNode *node : nodes)
     {
-      node->react(react, bb);
+      if (node->react(react, bb))
+        return true;
     }
+    return false;
   }
 
   CompoundNode &pushNode(BehNode *node)
@@ -92,7 +100,10 @@ struct Not : public BehNode
 
   Not(BehNode *node) : node(node) {}
 
-  void react(Reaction reaction, Blackboard &bb) override {}
+  bool react(Reaction reaction, Blackboard &bb) override 
+  {
+    return node->react(reaction, bb);
+  }
 
   BehResult update(flecs::world& ecs, flecs::entity entity, Blackboard& bb) override
   {
@@ -127,10 +138,17 @@ struct Selector : public CompoundNode
 struct MoveToEntity : public BehNode
 {
   size_t entityBb = size_t(-1); // wraps to 0xff...
-  MoveToEntity(flecs::entity entity, const char *bb_name)
+  bool ignoreRoar = false;
+  MoveToEntity(flecs::entity entity, const char *bb_name, bool ignore_roar)
     : entityBb(reg_entity_blackboard_var<flecs::entity>(entity, bb_name)) {}
 
-  void react(Reaction reaction, Blackboard &bb) override {}
+  bool react(Reaction reaction, Blackboard &bb) override 
+  {
+    if (reaction == ROAR)
+      return ignoreRoar;
+
+    return false;
+  }
 
   BehResult update(flecs::world &, flecs::entity entity, Blackboard &bb) override
   {
@@ -163,8 +181,6 @@ struct IsLowHp : public BehNode
   float threshold = 0.f;
   IsLowHp(float thres) : threshold(thres) {}
 
-  void react(Reaction reaction, Blackboard &bb) override {}
-
   BehResult update(flecs::world &, flecs::entity entity, Blackboard &) override
   {
     BehResult res = BEH_SUCCESS;
@@ -182,8 +198,6 @@ struct FindEnemy : public BehNode
   float distance = 0;
   FindEnemy(flecs::entity entity, float in_dist, const char *bb_name) 
     : entityBb(reg_entity_blackboard_var<flecs::entity>(entity, bb_name)), distance(in_dist) {}
-
-  void react(Reaction reaction, Blackboard &bb) override {}
 
   BehResult update(flecs::world &ecs, flecs::entity entity, Blackboard &bb) override
   {
@@ -222,8 +236,6 @@ struct FindPickUp : public BehNode
   FindPickUp(flecs::entity entity, const char* bb_name)
     : nextPickUpBb(reg_entity_blackboard_var<flecs::entity>(entity, bb_name)) {}
 
-  void react(Reaction reaction, Blackboard &bb) override {}
-
   BehResult update(flecs::world &ecs, flecs::entity entity, Blackboard &bb) override
   {
     BehResult res = BEH_FAIL;
@@ -259,8 +271,6 @@ struct CheckWaypoint : public BehNode
   CheckWaypoint(flecs::entity entity, const char *bb_name)
     : entityWaypointBb(reg_entity_blackboard_var<flecs::entity>(entity, bb_name)) {}
 
-  void react(Reaction reaction, Blackboard &bb) override {}
-
   BehResult update(flecs::world &, flecs::entity entity, Blackboard &bb) override
   {
     entity.set([&](const Position &pos)
@@ -285,8 +295,6 @@ struct Flee : public BehNode
   {
     entityBb = reg_entity_blackboard_var<flecs::entity>(entity, bb_name);
   }
-
-  void react(Reaction reaction, Blackboard &bb) override {}
 
   BehResult update(flecs::world &, flecs::entity entity, Blackboard &bb) override
   {
@@ -321,8 +329,6 @@ struct Patrol : public BehNode
     });
   }
 
-  void react(Reaction reaction, Blackboard &bb) override {}
-
   BehResult update(flecs::world &, flecs::entity entity, Blackboard &bb) override
   {
     BehResult res = BEH_RUNNING;
@@ -349,8 +355,6 @@ struct Roar : public BehNode
   {
 
   }
-
-  void react(Reaction reaction, Blackboard &bb) override {}
 
   BehResult update(flecs::world &ecs, flecs::entity entity, Blackboard &bb) override
   {
@@ -381,31 +385,29 @@ struct Roar : public BehNode
 struct ReactRoar : public BehNode
 {
   size_t reactBb = size_t(-1);
+  size_t payloadBb = size_t(-1);
 
-  ReactRoar(flecs::entity entity, const char *react_bb_name)
-    : reactBb(reg_entity_blackboard_var<bool>(entity, react_bb_name)) 
+  ReactRoar(flecs::entity entity, const char *payload_bb_name, const char *react_bb_name)
+    : payloadBb(reg_entity_blackboard_var<flecs::entity>(entity, payload_bb_name)),
+      reactBb(reg_entity_blackboard_var<flecs::entity>(entity, react_bb_name))
+      
   {
-    entity.set([&](Blackboard &bb, const Position &pos)
-    {
-      bb.set<bool>(reactBb, false);
-    });
   }
 
-  void react(Reaction reaction, Blackboard &bb) override
+  bool react(Reaction reaction, Blackboard &bb) override
   {
     if (reaction == ROAR)
     {
-      bb.set<bool>(reactBb, true);
+      auto ent = bb.get<flecs::entity>(payloadBb);
+      bb.set<flecs::entity>(reactBb, ent);
+      return true;
     }
+    return false;
   }
 
   BehResult update(flecs::world &ecs, flecs::entity entity, Blackboard &bb) override
   {
-    bool isReact = bb.get<bool>(reactBb);
-    if (isReact)
-      return BEH_SUCCESS;
-    else
-      return BEH_FAIL;
+    return BEH_SUCCESS;
   }
 };
 
@@ -447,9 +449,9 @@ BehNode *not_node(BehNode *node)
   return new Not(node);  
 }
 
-BehNode *move_to_entity(flecs::entity entity, const char *bb_name)
+BehNode *move_to_entity(flecs::entity entity, const char *bb_name, bool ignore_roar)
 {
-  return new MoveToEntity(entity, bb_name);
+  return new MoveToEntity(entity, bb_name, ignore_roar);
 }
 
 BehNode *check_waypoint(flecs::entity entity, const char *bb_name)
@@ -487,7 +489,7 @@ BehNode *roar(flecs::entity entity, float roar_dist, const char *bb_name, const 
   return new Roar(entity, roar_dist, bb_name, bb_enemy);
 }
 
-BehNode *react_roar(flecs::entity entity, const char *react_bb_name)
+BehNode *react_roar(flecs::entity entity, const char *payload_bb_name, const char *react_bb_name)
 {
-  return new ReactRoar(entity, react_bb_name);
+  return new ReactRoar(entity, payload_bb_name, react_bb_name);
 }
