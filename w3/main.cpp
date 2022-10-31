@@ -1,4 +1,3 @@
-// initial skeleton is a clone from https://github.com/jpcy/bgfx-minimal-example
 //
 #include "raylib.h"
 #include <flecs.h>
@@ -21,14 +20,14 @@ int main(int /*argc*/, const char ** /*argv*/)
 {
   int width = 1920;
   int height = 1080;
-  InitWindow(width, height, "w2 AI MIPT");
+  InitWindow(width, height, "w3 AI MIPT");
 
   const int scrWidth = GetMonitorWidth(0);
   const int scrHeight = GetMonitorHeight(0);
   if (scrWidth < width || scrHeight < height)
   {
     width = std::min(scrWidth, width);
-    height = std::min(scrHeight, height);
+    height = std::min(scrHeight - 150, height);
     SetWindowSize(width, height);
   }
 
