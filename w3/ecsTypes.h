@@ -65,6 +65,7 @@ enum Actions
   EA_MOVE_END,
   EA_ATTACK = EA_MOVE_END,
   EA_HEAL_SELF,
+  EA_SKIP_TURN,
   EA_NUM
 };
 
@@ -100,6 +101,7 @@ struct PlayerInput
   bool right = false;
   bool up = false;
   bool down = false;
+  bool skip = false;
 };
 
 struct Symbol
@@ -110,6 +112,8 @@ struct Symbol
 struct IsPlayer {};
 
 struct WorldInfoGatherer {};
+
+struct IsBase {};
 
 struct Team
 {

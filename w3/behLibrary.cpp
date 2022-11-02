@@ -4,6 +4,8 @@
 #include "math.h"
 #include "raylib.h"
 #include "blackboard.h"
+#include <algorithm>
+#include <random>
 
 struct CompoundNode : public BehNode
 {
@@ -54,19 +56,68 @@ struct Selector : public CompoundNode
 struct UtilitySelector : public BehNode
 {
   std::vector<std::pair<BehNode*, utility_function>> utilityNodes;
+  const float addScore = 0.25f;
+  const float damping = 0.05f;
+  float curAddScore = 0.0f;
+  size_t lastSelectedUtility = -1;
 
   BehResult update(flecs::world &ecs, flecs::entity entity, Blackboard &bb) override
   {
     std::vector<std::pair<float, size_t>> utilityScores;
     for (size_t i = 0; i < utilityNodes.size(); ++i)
     {
-      const float utilityScore = utilityNodes[i].second(bb);
+      const float utilityScore = utilityNodes[i].second(bb) + lastSelectedUtility == i ? curAddScore : 0.0f;
       utilityScores.push_back(std::make_pair(utilityScore, i));
     }
     std::sort(utilityScores.begin(), utilityScores.end(), [](auto &lhs, auto &rhs)
     {
       return lhs.first > rhs.first;
     });
+    for (const std::pair<float, size_t> &node : utilityScores)
+    {
+      size_t nodeIdx = node.second;
+      BehResult res = utilityNodes[nodeIdx].first->update(ecs, entity, bb);
+      if (res != BEH_FAIL)
+      {
+        if (curAddScore > 0.0f)
+          curAddScore -= damping;
+        if (lastSelectedUtility != nodeIdx)
+        {
+          curAddScore = addScore;
+          lastSelectedUtility = nodeIdx;
+        }
+        return res;
+      } 
+    }
+    lastSelectedUtility = -1;
+    return BEH_FAIL;
+  }
+};
+
+struct RandomUtilitySelector : public BehNode
+{
+  std::vector<std::pair<BehNode *, utility_function>> utilityNodes;
+
+  BehResult update(flecs::world &ecs, flecs::entity entity, Blackboard &bb) override
+  {
+    std::vector<std::pair<float, size_t>> utilityScores;
+    std::vector<float> distributionScores;
+    for (size_t i = 0; i < utilityNodes.size(); ++i)
+    {
+      const float utilityScore = utilityNodes[i].second(bb);
+      utilityScores.push_back(std::make_pair(utilityScore, i));
+      distributionScores.push_back(utilityScore);
+    }
+    std::sort(utilityScores.begin(), utilityScores.end(), [](auto &lhs, auto &rhs)
+    {
+      return lhs.first > rhs.first;
+    });
+    std::default_random_engine generator;
+    std::discrete_distribution<int> distribution(distributionScores.begin(), distributionScores.end());
+    size_t randIdx = distribution(generator);
+    BehResult randRes = utilityNodes[randIdx].first->update(ecs, entity, bb);
+    if (randRes != BEH_FAIL)
+      return randRes;
     for (const std::pair<float, size_t> &node : utilityScores)
     {
       size_t nodeIdx = node.second;
