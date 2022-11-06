@@ -56,7 +56,7 @@ struct Selector : public CompoundNode
 struct UtilitySelector : public BehNode
 {
   std::vector<std::pair<BehNode*, utility_function>> utilityNodes;
-  const float addScore = 0.0f;
+  const float addScore = 0.25f;
   const float damping = 0.05f;
   float curAddScore = 0.0f;
   size_t lastSelectedUtility = -1;

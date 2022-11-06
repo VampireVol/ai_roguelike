@@ -249,13 +249,13 @@ void init_roguelike(flecs::world &ecs)
   //create_fuzzy_monster_beh(create_monster(ecs, 10, -5, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
   //create_fuzzy_monster_beh(create_monster(ecs, -5, -5, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
   //create_fuzzy_monster_beh(create_monster(ecs, -5, 5, Color{0, 255, 0, 255}, "minotaur_tex"));
-  //create_randomwalker_beh(create_monster(ecs, -5, 5, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
-  //create_randomwalker_beh(create_monster(ecs, -4, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
-  //create_randomwalker_beh(create_monster(ecs, -5, 7, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
-  //create_randomwalker_beh(create_monster(ecs, -6, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
+  create_randomwalker_beh(create_monster(ecs, -5, 5, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
+  create_randomwalker_beh(create_monster(ecs, -4, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
+  create_randomwalker_beh(create_monster(ecs, -5, 7, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
+  create_randomwalker_beh(create_monster(ecs, -6, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
   create_randomwalker_beh(create_monster(ecs, -7, 8, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
   create_randomwalker_beh(create_monster(ecs, -7, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
-  //create_randomwalker_beh(create_monster(ecs, -8, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
+  create_randomwalker_beh(create_monster(ecs, -8, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
 
   create_base(ecs, 2, 2);
 
