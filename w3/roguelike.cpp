@@ -104,9 +104,9 @@ static void create_randomwalker_beh(flecs::entity e)
         move_to_base(),
         [](Blackboard &bb)
         {
-          /*const float enemyDist = bb.get<float>("enemyDist");
-          return std::clamp(-0.25f * enemyDist + 1.25f, 0.5f, 1.f);*/
-          return 0.5f;
+          const float enemyDist = bb.get<float>("enemyDist");
+          const float baseDist = bb.get<float>("baseDist");
+          return std::clamp(-0.25f * enemyDist + 0.5f, 0.5f, 1.f) - std::clamp(-0.25f * baseDist + 1.25f, 0.0f, 0.5f);
         }
       )
       });
@@ -254,7 +254,7 @@ void init_roguelike(flecs::world &ecs)
   //create_randomwalker_beh(create_monster(ecs, -5, 7, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
   //create_randomwalker_beh(create_monster(ecs, -6, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
   create_randomwalker_beh(create_monster(ecs, -7, 8, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
-  //create_randomwalker_beh(create_monster(ecs, -7, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
+  create_randomwalker_beh(create_monster(ecs, -7, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
   //create_randomwalker_beh(create_monster(ecs, -8, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
 
   create_base(ecs, 2, 2);
