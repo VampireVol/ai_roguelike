@@ -97,7 +97,7 @@ static void create_randomwalker_beh(flecs::entity e)
         {
           const float enemyDist = bb.get<float>("enemyDist");
           const float baseDist = bb.get<float>("baseDist");
-          return 1.f - std::clamp(baseDist / 10.f + enemyDist / 10.f, 0.f, 1.f);
+          return 1.f - std::clamp(baseDist / 20.f + enemyDist / 20.f, 0.f, 1.f);
         }
       ),
       std::make_pair(
