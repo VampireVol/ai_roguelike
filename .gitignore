@@ -53,6 +53,8 @@ Debug/
 *.recipe
 *.exp
 *.ilk
+*.sln
+*.vcxproj
 *.vcxproj.*
 *.iobj
 *.ipdb
