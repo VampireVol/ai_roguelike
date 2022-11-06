@@ -56,7 +56,7 @@ struct Selector : public CompoundNode
 struct UtilitySelector : public BehNode
 {
   std::vector<std::pair<BehNode*, utility_function>> utilityNodes;
-  const float addScore = 0.25f;
+  const float addScore = 0.0f;
   const float damping = 0.05f;
   float curAddScore = 0.0f;
   size_t lastSelectedUtility = -1;
@@ -66,7 +66,7 @@ struct UtilitySelector : public BehNode
     std::vector<std::pair<float, size_t>> utilityScores;
     for (size_t i = 0; i < utilityNodes.size(); ++i)
     {
-      const float utilityScore = utilityNodes[i].second(bb) + lastSelectedUtility == i ? curAddScore : 0.0f;
+      const float utilityScore = utilityNodes[i].second(bb) + (lastSelectedUtility == i ? curAddScore : 0.0f);
       utilityScores.push_back(std::make_pair(utilityScore, i));
     }
     std::sort(utilityScores.begin(), utilityScores.end(), [](auto &lhs, auto &rhs)
@@ -149,6 +149,45 @@ struct MoveToEntity : public BehNode
         return;
       }
       targetEntity.get([&](const Position &target_pos)
+      {
+        if (pos != target_pos)
+        {
+          a.action = move_towards(pos, target_pos);
+          res = BEH_RUNNING;
+        }
+        else
+          res = BEH_SUCCESS;
+      });
+    });
+    return res;
+  }
+};
+
+struct RandomWalk : public BehNode
+{
+  BehResult update(flecs::world &, flecs::entity entity, Blackboard &bb) override
+  {
+    BehResult res = BEH_RUNNING;
+    entity.set([&](Action &a)
+    {
+      std::random_device rd{};
+      std::default_random_engine generator(rd());
+      std::uniform_int_distribution<int> distribution(EA_MOVE_START, EA_MOVE_START + 3);
+      a.action = distribution(generator);
+    });
+    return res;
+  }
+};
+
+struct MoveToBase : public BehNode
+{
+  BehResult update(flecs::world &ecs, flecs::entity entity, Blackboard &) override
+  {
+    static auto baseQuery = ecs.query<const IsBase, const Position>();
+    BehResult res = BEH_RUNNING;
+    entity.set([&](Action &a, const Position &pos)
+    {
+      baseQuery.each([&](const IsBase, const Position &target_pos)
       {
         if (pos != target_pos)
         {
@@ -322,6 +361,16 @@ BehNode *utility_selector(const std::vector<std::pair<BehNode*, utility_function
 BehNode *move_to_entity(flecs::entity entity, const char *bb_name)
 {
   return new MoveToEntity(entity, bb_name);
+}
+
+BehNode *random_walk()
+{
+  return new RandomWalk;
+}
+
+BehNode *move_to_base()
+{
+  return new MoveToBase;
 }
 
 BehNode *is_low_hp(float thres)

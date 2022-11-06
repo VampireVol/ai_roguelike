@@ -25,6 +25,8 @@ BehNode *selector(const std::vector<BehNode*> &nodes);
 BehNode *utility_selector(const std::vector<std::pair<BehNode*, utility_function>> &nodes);
 
 BehNode *move_to_entity(flecs::entity entity, const char *bb_name);
+BehNode *random_walk();
+BehNode *move_to_base();
 BehNode *is_low_hp(float thres);
 BehNode *find_enemy(flecs::entity entity, float dist, const char *bb_name);
 BehNode *flee(flecs::entity entity, const char *bb_name);

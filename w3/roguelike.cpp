@@ -5,6 +5,7 @@
 #include "aiLibrary.h"
 #include "blackboard.h"
 #include "math.h"
+#include <algorithm>
 
 static void create_fuzzy_monster_beh(flecs::entity e)
 {
@@ -71,6 +72,46 @@ static void create_minotaur_beh(flecs::entity e)
       patrol(e, 2.f, "patrol_pos")
     });
   e.set(BehaviourTree{root});
+}
+
+static void create_randomwalker_beh(flecs::entity e)
+{
+  e.set(Blackboard{});
+  BehNode *root =
+    utility_selector({
+      std::make_pair(
+        random_walk(),
+        [](Blackboard &bb)
+        {
+          const float allyDist = bb.get<float>("allyDist");
+          const float baseDist = bb.get<float>("baseDist");
+          return 1.f - std::clamp(std::min(baseDist / 6.f, allyDist / 6.f), 0.25f, 1.f);
+        }
+      ),
+      std::make_pair(
+        sequence({
+          find_enemy(e, 3.f, "attack_enemy"),
+          move_to_entity(e, "attack_enemy")
+        }),
+        [](Blackboard &bb)
+        {
+          const float enemyDist = bb.get<float>("enemyDist");
+          const float baseDist = bb.get<float>("baseDist");
+          return 1.f - std::clamp(baseDist / 10.f + enemyDist / 10.f, 0.f, 1.f);
+        }
+      ),
+      std::make_pair(
+        move_to_base(),
+        [](Blackboard &bb)
+        {
+          /*const float enemyDist = bb.get<float>("enemyDist");
+          return std::clamp(-0.25f * enemyDist + 1.25f, 0.5f, 1.f);*/
+          return 0.5f;
+        }
+      )
+      });
+  e.add<WorldInfoGatherer>();
+  e.set(BehaviourTree{ root });
 }
 
 static flecs::entity create_monster(flecs::world &ecs, int x, int y, Color col, const char *texture_src)
@@ -208,6 +249,13 @@ void init_roguelike(flecs::world &ecs)
   //create_fuzzy_monster_beh(create_monster(ecs, 10, -5, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
   //create_fuzzy_monster_beh(create_monster(ecs, -5, -5, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
   //create_fuzzy_monster_beh(create_monster(ecs, -5, 5, Color{0, 255, 0, 255}, "minotaur_tex"));
+  //create_randomwalker_beh(create_monster(ecs, -5, 5, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
+  //create_randomwalker_beh(create_monster(ecs, -4, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
+  //create_randomwalker_beh(create_monster(ecs, -5, 7, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
+  //create_randomwalker_beh(create_monster(ecs, -6, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
+  create_randomwalker_beh(create_monster(ecs, -7, 8, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
+  //create_randomwalker_beh(create_monster(ecs, -7, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
+  //create_randomwalker_beh(create_monster(ecs, -8, 6, Color{ 0, 255, 0, 255 }, "minotaur_tex"));
 
   create_base(ecs, 2, 2);
 
@@ -396,7 +444,7 @@ static void gather_world_info(flecs::world &ecs)
       if (team.team == ateam.team)
       {
         const float allyDist = dist(pos, apos);
-        if (allyDist < closestAllyDist)
+        if (allyDist < closestAllyDist && allyDist > 0.f)
           closestAllyDist = allyDist;
       }
     });
@@ -407,7 +455,7 @@ static void gather_world_info(flecs::world &ecs)
     push_info_to_bb(bb, "alliesNum", numAllies);
     push_info_to_bb(bb, "enemyDist", closestEnemyDist);
     push_info_to_bb(bb, "allyDist", closestAllyDist);
-    push_info_to_bb(bb, "distToBase", distToBase);
+    push_info_to_bb(bb, "baseDist", distToBase);
   });
 }
 
