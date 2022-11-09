@@ -72,6 +72,7 @@ enum Actions
   EA_MOVE_END,
   EA_ATTACK = EA_MOVE_END,
   EA_HEAL_SELF,
+  EA_RESEARCH,
   EA_NUM
 };
 
@@ -107,6 +108,7 @@ struct PlayerInput
   bool right = false;
   bool up = false;
   bool down = false;
+  bool reserach = false;
 };
 
 struct Symbol
@@ -141,6 +143,7 @@ struct BackgroundTile {};
 struct DungeonData
 {
   std::vector<char> tiles; // for pathfinding
+  std::vector<bool> researchedTiles;
   size_t width;
   size_t height;
 };

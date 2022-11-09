@@ -18,6 +18,14 @@ static void query_characters_positions(flecs::world &ecs, Callable c)
   characterPositionQuery.each(c);
 }
 
+template<typename Callable>
+static void query_player_position(flecs::world &ecs, Callable c)
+{
+  static auto playerPositionQuery = ecs.query<const Position, const IsPlayer>();
+
+  playerPositionQuery.each(c);
+}
+
 constexpr float invalid_tile_value = 1e5f;
 
 static void init_tiles(std::vector<float> &map, const DungeonData &dd)
@@ -102,6 +110,36 @@ void dmaps::gen_hive_pack_map(flecs::world &ecs, std::vector<float> &map)
     {
       map[pos.y * dd.width + pos.x] = 0.f;
     });
+    process_dmap(map, dd);
+  });
+}
+
+void dmaps::gen_research_map(flecs::world &ecs, std::vector<float> &map)
+{
+  static auto dungeonDataQuery = ecs.query<DungeonData>();
+  dungeonDataQuery.each([&](DungeonData &dd)
+  {
+    init_tiles(map, dd);
+    query_player_position(ecs, [&](const Position &pos, const IsPlayer)
+    {
+      constexpr int radius_research = 1;
+      for (int i = -radius_research; i <= radius_research; ++i)
+      {
+        for (int j = -radius_research; j <= radius_research; ++j)
+        {
+          int idx = (pos.y + i) * dd.width + pos.x + j;
+          if (idx > 0 && idx < dd.width * dd.height)
+          {
+            dd.researchedTiles[idx] = true;
+          }
+        }
+      }
+    });
+    for (int i = 0; i < map.size(); ++i)
+    {
+      if (!dd.researchedTiles[i])
+        map[i] = 0.f;
+    }
     process_dmap(map, dd);
   });
 }

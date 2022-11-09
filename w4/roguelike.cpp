@@ -9,6 +9,8 @@
 #include "dijkstraMapGen.h"
 #include "dmapFollower.h"
 
+constexpr bool research_enabled = true;
+
 static flecs::entity create_player_approacher(flecs::entity e)
 {
   e.set(DmapWeights{{{"approach_map", {1.f, 1.f}}}});
@@ -36,6 +38,7 @@ static flecs::entity create_hive_monster(flecs::entity e)
 static flecs::entity create_hive(flecs::entity e)
 {
   e.add<Hive>();
+  return e;
 }
 
 
@@ -149,7 +152,7 @@ static void create_player(flecs::world &ecs, const char *texture_src)
   Position pos = find_free_dungeon_tile(ecs);
 
   flecs::entity textureSrc = ecs.entity(texture_src);
-  ecs.entity("player")
+  flecs::entity player = ecs.entity("player")
     .set(Position{pos.x, pos.y})
     .set(MovePos{pos.x, pos.y})
     .set(Hitpoints{100.f})
@@ -162,6 +165,8 @@ static void create_player(flecs::world &ecs, const char *texture_src)
     .set(Color{255, 255, 255, 255})
     .add<TextureSource>(textureSrc)
     .set(MeleeDamage{50.f});
+  if (research_enabled)
+    player.set(DmapWeights{ {{"research_map", {1.f, 1.f}}} });
 }
 
 static void create_heal(flecs::world &ecs, int x, int y, float amount)
@@ -190,6 +195,7 @@ static void register_roguelike_systems(flecs::world &ecs)
       bool right = IsKeyDown(KEY_RIGHT);
       bool up = IsKeyDown(KEY_UP);
       bool down = IsKeyDown(KEY_DOWN);
+      bool research = IsKeyDown(KEY_E);
       if (left && !inp.left)
         a.action = EA_MOVE_LEFT;
       if (right && !inp.right)
@@ -198,6 +204,8 @@ static void register_roguelike_systems(flecs::world &ecs)
         a.action = EA_MOVE_UP;
       if (down && !inp.down)
         a.action = EA_MOVE_DOWN;
+      if (research)
+        a.action = EA_RESEARCH;
       inp.left = left;
       inp.right = right;
       inp.up = up;
@@ -208,10 +216,18 @@ static void register_roguelike_systems(flecs::world &ecs)
     .term<BackgroundTile>()
     .each([&](flecs::entity e, const Position &pos, const Color color)
     {
-      const auto textureSrc = e.target<TextureSource>();
-      DrawTextureQuad(*textureSrc.get<Texture2D>(),
-          Vector2{1, 1}, Vector2{0, 0},
-          Rectangle{float(pos.x) * tile_size, float(pos.y) * tile_size, tile_size, tile_size}, color);
+        dungeonDataQuery.each([&](const DungeonData &dd)
+          {
+            if (dd.researchedTiles[pos.y * dd.width + pos.x])
+            {
+              const auto textureSrc = e.target<TextureSource>();
+              DrawTextureQuad(*textureSrc.get<Texture2D>(),
+                Vector2{ 1, 1 }, Vector2{ 0, 0 },
+                Rectangle{ float(pos.x) * tile_size, float(pos.y) * tile_size, tile_size, tile_size }, color);
+            }
+            
+          });
+      
     });
   ecs.system<const Position, const Color>()
     .term<TextureSource>(flecs::Wildcard).not_()
@@ -275,6 +291,7 @@ static void register_roguelike_systems(flecs::world &ecs)
           }
       });
     });
+
   ecs.system<const DijkstraMapData>()
     .term<VisualiseMap>()
     .each([](const DijkstraMapData &dmap)
@@ -310,10 +327,10 @@ void init_roguelike(flecs::world &ecs)
         UnloadTexture(texture);
       });
 
-  create_hive_monster(create_monster(ecs, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
-  create_hive_monster(create_monster(ecs, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
-  create_hive_monster(create_monster(ecs, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
-  create_hive(create_player_fleer(create_monster(ecs, Color{0, 255, 0, 255}, "minotaur_tex")));
+  //create_hive_monster(create_monster(ecs, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
+  //create_hive_monster(create_monster(ecs, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
+  //create_hive_monster(create_monster(ecs, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
+  //create_hive(create_player_fleer(create_monster(ecs, Color{0, 255, 0, 255}, "minotaur_tex")));
 
   create_player(ecs, "swordsman_tex");
 
@@ -330,12 +347,16 @@ void init_dungeon(flecs::world &ecs, char *tiles, size_t w, size_t h)
     .set(Texture2D{LoadTexture("assets/floor.png")});
 
   std::vector<char> dungeonData;
+  std::vector<bool> researchedMap;
   dungeonData.resize(w * h);
+  researchedMap.resize(w * h);
+  if (!research_enabled)
+    std::fill(researchedMap.begin(), researchedMap.end(), true);
   for (size_t y = 0; y < h; ++y)
     for (size_t x = 0; x < w; ++x)
       dungeonData[y * w + x] = tiles[y * w + x];
   ecs.entity("dungeon")
-    .set(DungeonData{dungeonData, w, h});
+    .set(DungeonData{dungeonData, researchedMap, w, h});
 
   for (size_t y = 0; y < h; ++y)
     for (size_t x = 0; x < w; ++x)
@@ -344,7 +365,7 @@ void init_dungeon(flecs::world &ecs, char *tiles, size_t w, size_t h)
       flecs::entity tileEntity = ecs.entity()
         .add<BackgroundTile>()
         .set(Position{int(x), int(y)})
-        .set(Color{255, 255, 255, 255});
+        .set(Color{ WHITE });
       if (tile == dungeon::wall)
         tileEntity.add<TextureSource>(wallTex);
       else if (tile == dungeon::floor)
@@ -566,8 +587,15 @@ void process_turn(flecs::world &ecs)
 
     //ecs.entity("flee_map").add<VisualiseMap>();
     ecs.entity("hive_follower_sum")
-      .set(DmapWeights{{{"hive_map", {1.f, 1.f}}, {"approach_map", {1.8f, 0.8f}}}})
-      .add<VisualiseMap>();
+      .set(DmapWeights{{{"hive_map", {1.f, 1.f}}, {"approach_map", {1.8f, 0.8f}}}});
+      
+
+    std::vector<float> researchMap;
+    dmaps::gen_research_map(ecs, researchMap);
+    ecs.entity("research_map")
+      .set(DijkstraMapData{researchMap});
+    if (research_enabled)
+      ecs.entity("research_map").add<VisualiseMap>();
   }
 }
 
