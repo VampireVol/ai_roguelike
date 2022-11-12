@@ -593,7 +593,7 @@ void process_turn(flecs::world &ecs)
     process_actions(ecs);
 
     std::vector<float> approachMap;
-    dmaps::gen_player_approach_map(ecs, approachMap, { 1.f, true });
+    dmaps::gen_player_approach_map(ecs, approachMap, {1.f, true});
     ecs.entity("approach_map")
       .set(DijkstraMapData{approachMap});
 

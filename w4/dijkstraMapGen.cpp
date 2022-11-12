@@ -79,9 +79,9 @@ static void process_dmap(std::vector<float> &map, const DungeonData &dd, const D
       if (map[i] < invalid_tile_value)
       {
         if (params.isAPow)
-          map[i] = std::copysignf(std::powf(std::abs(map[i]), params.a), map[i]);
+          map[i] = copysignf(powf(abs(map[i]), params.a), map[i]);
         else
-          map[i] = std::powf(params.a, map[i]);
+          map[i] = powf(params.a, map[i]);
       }
     }
 }
