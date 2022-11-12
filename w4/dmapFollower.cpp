@@ -1,11 +1,16 @@
 #include "ecsTypes.h"
 #include "dmapFollower.h"
 #include <cmath>
+#include "dungeonUtils.h"
+
+
 
 void process_dmap_followers(flecs::world &ecs)
 {
   static auto processDmapFollowers = ecs.query<const Position, Action, const DmapWeights>();
+  static auto processDmapArcher = ecs.query<const Position, Action, const DmapWeights, const Team, const IsArcher>();
   static auto dungeonDataQuery = ecs.query<const DungeonData>();
+  static auto findRangeEnemy = ecs.query<const MovePos, const Hitpoints, const Team>();
 
   auto get_dmap_at = [&](const DijkstraMapData &dmap, const DungeonData &dd, size_t x, size_t y, float mult, float pow)
   {
@@ -39,6 +44,11 @@ void process_dmap_followers(flecs::world &ecs)
           minWt = moveWeights[i];
           act.action = i;
         }
+    });
+    processDmapArcher.each([&](flecs::entity e, const Position &pos, Action &act, const DmapWeights &wt, const Team &team, const IsArcher)
+    {
+      if (act.action == EA_NOP)
+        act.action = EA_ARCHERY_SHOT;
     });
   });
 }

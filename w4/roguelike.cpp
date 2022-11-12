@@ -9,7 +9,7 @@
 #include "dijkstraMapGen.h"
 #include "dmapFollower.h"
 
-constexpr bool research_enabled = true;
+constexpr bool research_enabled = false;
 
 static flecs::entity create_player_approacher(flecs::entity e)
 {
@@ -38,6 +38,13 @@ static flecs::entity create_hive_monster(flecs::entity e)
 static flecs::entity create_hive(flecs::entity e)
 {
   e.add<Hive>();
+  return e;
+}
+
+static flecs::entity create_archer(flecs::entity e)
+{
+  e.set(DmapWeights{{{"archer_map", {1.f, 1.f}}}})
+   .add<IsArcher>();
   return e;
 }
 
@@ -332,6 +339,8 @@ void init_roguelike(flecs::world &ecs)
   //create_hive_monster(create_monster(ecs, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
   //create_hive(create_player_fleer(create_monster(ecs, Color{0, 255, 0, 255}, "minotaur_tex")));
 
+  create_archer(create_monster(ecs, Color{ 0x11, 0x11, 0x11, 0xff }, "minotaur_tex"));
+
   create_player(ecs, "swordsman_tex");
 
   ecs.entity("world")
@@ -426,6 +435,8 @@ static void process_actions(flecs::world &ecs)
   static auto processActions = ecs.query<Action, Position, MovePos, const MeleeDamage, const Team>();
   static auto processHeals = ecs.query<Action, Hitpoints>();
   static auto checkAttacks = ecs.query<const MovePos, Hitpoints, const Team>();
+  static auto checkRangeAttacks = ecs.query<const MovePos, Hitpoints, const Team>();
+  static auto dungeonDataQuery = ecs.query<const DungeonData>();
   // Process all actions
   ecs.defer([&]
   {
@@ -450,6 +461,17 @@ static void process_actions(flecs::world &ecs)
           if (team.team != enemy_team.team)
           {
             push_to_log(ecs, "damaged entity");
+            hp.hitpoints -= dmg.damage;
+          }
+        }
+      });
+      checkRangeAttacks.each([&](flecs::entity enemy, const MovePos &epos, Hitpoints &hp, const Team &enemy_team)
+      {
+        if (a.action == EA_ARCHERY_SHOT && entity != enemy && team.team != enemy_team.team)
+        {
+          const float distToEnemy = dist(pos, epos);
+          if (distToEnemy <= dungeon::rangeDistance)
+          {
             hp.hitpoints -= dmg.damage;
           }
         }
@@ -571,17 +593,17 @@ void process_turn(flecs::world &ecs)
     process_actions(ecs);
 
     std::vector<float> approachMap;
-    dmaps::gen_player_approach_map(ecs, approachMap);
+    dmaps::gen_player_approach_map(ecs, approachMap, { 1.f, true });
     ecs.entity("approach_map")
       .set(DijkstraMapData{approachMap});
 
     std::vector<float> fleeMap;
-    dmaps::gen_player_flee_map(ecs, fleeMap);
+    dmaps::gen_player_flee_map(ecs, fleeMap, { 1.f, true });
     ecs.entity("flee_map")
       .set(DijkstraMapData{fleeMap});
 
     std::vector<float> hiveMap;
-    dmaps::gen_hive_pack_map(ecs, hiveMap);
+    dmaps::gen_hive_pack_map(ecs, hiveMap, { 1.f, true });
     ecs.entity("hive_map")
       .set(DijkstraMapData{hiveMap});
 
@@ -589,9 +611,14 @@ void process_turn(flecs::world &ecs)
     ecs.entity("hive_follower_sum")
       .set(DmapWeights{{{"hive_map", {1.f, 1.f}}, {"approach_map", {1.8f, 0.8f}}}});
       
+    std::vector<float> archerMap;
+    dmaps::gen_archer_map(ecs, archerMap, {1.f, true});
+    ecs.entity("archer_map")
+      .set(DijkstraMapData{archerMap})
+      .add<VisualiseMap>();
 
     std::vector<float> researchMap;
-    dmaps::gen_research_map(ecs, researchMap);
+    dmaps::gen_research_map(ecs, researchMap, { 1.f, true });
     ecs.entity("research_map")
       .set(DijkstraMapData{researchMap});
     if (research_enabled)

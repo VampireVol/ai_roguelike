@@ -1,5 +1,6 @@
 #include "dungeonUtils.h"
 #include "raylib.h"
+#include "math.h"
 
 Position dungeon::find_walkable_tile(flecs::world &ecs)
 {
@@ -33,5 +34,25 @@ bool dungeon::is_tile_walkable(flecs::world &ecs, Position pos)
     res = dd.tiles[size_t(pos.y) * dd.width + size_t(pos.x)] == dungeon::floor;
   });
   return res;
+}
+
+bool dungeon::is_tile_reahable(flecs::world &ecs, Position from, Position to)
+{
+  static auto dungeonDataQuery = ecs.query<const DungeonData>();
+  bool reachable = true;
+  dungeonDataQuery.each([&](const DungeonData &dd)
+  {
+    while (dist_sq(from, to) > 0.f && reachable)
+    {
+      const Position delta = from - to;
+      if (abs(delta.x) > abs(delta.y))
+        from.x += delta.x > 0 ? -1 : 1;
+      else
+        from.y += delta.y > 0 ? -1 : 1;
+      reachable = (dd.tiles[size_t(from.y) * dd.width + size_t(from.x)] == dungeon::floor);
+    }
+  });
+  
+  return reachable;
 }
 

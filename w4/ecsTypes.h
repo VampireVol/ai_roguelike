@@ -24,6 +24,12 @@ struct Position
   Position &operator=(const MovePos &rhs);
 };
 
+struct ShotTraget
+{
+  int x = 0;
+  int y = 0;
+};
+
 inline Position &Position::operator=(const MovePos &rhs)
 {
   x = rhs.x;
@@ -73,6 +79,7 @@ enum Actions
   EA_ATTACK = EA_MOVE_END,
   EA_HEAL_SELF,
   EA_RESEARCH,
+  EA_ARCHERY_SHOT,
   EA_NUM
 };
 
@@ -166,3 +173,11 @@ struct DmapWeights
 };
 
 struct Hive {};
+
+struct IsArcher {};
+
+struct DmapParams
+{
+  float a = 1.f;
+  bool isAPow = true;
+};
