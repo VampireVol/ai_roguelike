@@ -1,6 +1,7 @@
 #include "dijkstraMapGen.h"
 #include "ecsTypes.h"
 #include "dungeonUtils.h"
+#include <cmath>
 
 template<typename Callable>
 static void query_dungeon_data(flecs::world &ecs, Callable c)
