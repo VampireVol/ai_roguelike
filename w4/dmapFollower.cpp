@@ -16,7 +16,7 @@ void process_dmap_followers(flecs::world &ecs)
   {
     const float v = dmap.map[y * dd.width + x];
     if (v < 1e5f)
-      return powf(v * mult, pow);
+      return copysignf(powf(abs(v * mult), pow), v);
     return v;
   };
   dungeonDataQuery.each([&](const DungeonData &dd)

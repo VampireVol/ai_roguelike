@@ -135,7 +135,7 @@ void dmaps::gen_research_map(flecs::world &ecs, std::vector<float> &map, const D
     init_tiles(map, dd);
     query_player_position(ecs, [&](const Position &pos, const IsPlayer)
     {
-      constexpr int radius_research = 1;
+      constexpr int radius_research = 2;
       constexpr int radius_wallcheck = radius_research + 1;
       for (int i = -radius_research; i <= radius_research; ++i)
       {
@@ -199,6 +199,42 @@ void dmaps::gen_archer_map(flecs::world &ecs, std::vector<float> &map, const Dma
       }
     });
     process_dmap(map, dd, params);
+  });
+}
+
+void dmaps::gen_flee_from_monster_map(flecs::world &ecs, std::vector<float> &map, const DmapParams &params)
+{
+  query_dungeon_data(ecs, [&](const DungeonData &dd)
+  {
+    map.resize(dd.width * dd.height);
+    for (int i = 0; i < map.size(); ++i)
+      map[i] = invalid_tile_value;
+
+    
+    bool haveEnemy = false;
+    query_characters_positions(ecs, [&](const Position &pos, const Team &t)
+    {
+      const int posIdx = pos.y * dd.width + pos.x;
+      if (t.team == 1 && dd.researchedTiles[posIdx]) // monster team hardcode
+      {
+        haveEnemy = true;
+        map[posIdx] = 0.f;
+      }
+    });
+    if (haveEnemy)
+    {
+      process_dmap(map, dd, params);
+      for (float &v : map)
+        if (v < invalid_tile_value)
+          v *= -1.2f;
+    }
+    else
+    {
+      for (int i = 0; i < map.size(); ++i)
+        if (dd.researchedTiles[i])
+          map[i] = 0.0f;
+    }
+          
   });
 }
 

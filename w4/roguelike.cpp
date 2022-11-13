@@ -9,7 +9,10 @@
 #include "dijkstraMapGen.h"
 #include "dmapFollower.h"
 
+constexpr bool horror_research_enabled = false;
 constexpr bool research_enabled = false;
+constexpr bool archer_enabled = false;
+constexpr bool draw_function_example = true;
 
 static flecs::entity create_player_approacher(flecs::entity e)
 {
@@ -173,7 +176,9 @@ static void create_player(flecs::world &ecs, const char *texture_src)
     .add<TextureSource>(textureSrc)
     .set(MeleeDamage{50.f});
   if (research_enabled)
-    player.set(DmapWeights{ {{"research_map", {1.f, 1.f}}} });
+    player.set(DmapWeights{ {{"research_map", {1.0f, 1.0f}}} });
+  if (horror_research_enabled)
+    player.set(DmapWeights{ {{"research_map", {1.0f, 1.0f}}, {"flee_from_monster_map", {2.5f, 0.9f}}} });
 }
 
 static void create_heal(flecs::world &ecs, int x, int y, float amount)
@@ -223,18 +228,16 @@ static void register_roguelike_systems(flecs::world &ecs)
     .term<BackgroundTile>()
     .each([&](flecs::entity e, const Position &pos, const Color color)
     {
-        dungeonDataQuery.each([&](const DungeonData &dd)
-          {
-            if (dd.researchedTiles[pos.y * dd.width + pos.x])
-            {
-              const auto textureSrc = e.target<TextureSource>();
-              DrawTextureQuad(*textureSrc.get<Texture2D>(),
-                Vector2{ 1, 1 }, Vector2{ 0, 0 },
-                Rectangle{ float(pos.x) * tile_size, float(pos.y) * tile_size, tile_size, tile_size }, color);
-            }
-            
-          });
-      
+      dungeonDataQuery.each([&](const DungeonData &dd)
+      {
+        if (dd.researchedTiles[pos.y * dd.width + pos.x])
+        {
+          const auto textureSrc = e.target<TextureSource>();
+          DrawTextureQuad(*textureSrc.get<Texture2D>(),
+            Vector2{ 1, 1 }, Vector2{ 0, 0 },
+            Rectangle{ float(pos.x) * tile_size, float(pos.y) * tile_size, tile_size, tile_size }, color);
+        }    
+      });
     });
   ecs.system<const Position, const Color>()
     .term<TextureSource>(flecs::Wildcard).not_()
@@ -248,22 +251,33 @@ static void register_roguelike_systems(flecs::world &ecs)
     .term<BackgroundTile>().not_()
     .each([&](flecs::entity e, const Position &pos, const Color color)
     {
-      const auto textureSrc = e.target<TextureSource>();
-      DrawTextureQuad(*textureSrc.get<Texture2D>(),
-          Vector2{1, 1}, Vector2{0, 0},
-          Rectangle{float(pos.x) * tile_size, float(pos.y) * tile_size, tile_size, tile_size}, color);
+      dungeonDataQuery.each([&](const DungeonData &dd)
+      {
+        if (dd.researchedTiles[pos.y * dd.width + pos.x])
+        {
+          const auto textureSrc = e.target<TextureSource>();
+          DrawTextureQuad(*textureSrc.get<Texture2D>(),
+              Vector2{1, 1}, Vector2{0, 0},
+              Rectangle{float(pos.x) * tile_size, float(pos.y) * tile_size, tile_size, tile_size}, color);
+        }
+      });
     });
   ecs.system<const Position, const Hitpoints>()
     .each([&](const Position &pos, const Hitpoints &hp)
     {
-      constexpr float hpPadding = 0.05f;
-      const float hpWidth = 1.f - 2.f * hpPadding;
-      const Rectangle underRect = {float(pos.x + hpPadding) * tile_size, float(pos.y-0.25f) * tile_size,
-                                   hpWidth * tile_size, 0.1f * tile_size};
-      DrawRectangleRec(underRect, BLACK);
-      const Rectangle hpRect = {float(pos.x + hpPadding) * tile_size, float(pos.y-0.25f) * tile_size,
-                                hp.hitpoints / 100.f * hpWidth * tile_size, 0.1f * tile_size};
-      DrawRectangleRec(hpRect, RED);
+      dungeonDataQuery.each([&](const DungeonData &dd){
+        if (dd.researchedTiles[pos.y * dd.width + pos.x])
+        {
+          constexpr float hpPadding = 0.05f;
+          const float hpWidth = 1.f - 2.f * hpPadding;
+          const Rectangle underRect = {float(pos.x + hpPadding) * tile_size, float(pos.y-0.25f) * tile_size,
+                                       hpWidth * tile_size, 0.1f * tile_size};
+          DrawRectangleRec(underRect, BLACK);
+          const Rectangle hpRect = {float(pos.x + hpPadding) * tile_size, float(pos.y-0.25f) * tile_size,
+                                    hp.hitpoints / 100.f * hpWidth * tile_size, 0.1f * tile_size};
+          DrawRectangleRec(hpRect, RED);
+        }
+      });
     });
 
   ecs.system<Texture2D>()
@@ -287,7 +301,7 @@ static void register_roguelike_systems(flecs::world &ecs)
               {
                 float v = dmap.map[y * dd.width + x];
                 if (v < 1e5f)
-                  sum += powf(v * pair.second.mult, pair.second.pow);
+                  sum += copysignf(powf(abs(v * pair.second.mult), pair.second.pow), v);
                 else
                   sum += v;
               });
@@ -326,6 +340,8 @@ void init_roguelike(flecs::world &ecs)
     .set(Texture2D{LoadTexture("assets/swordsman.png")});
   ecs.entity("minotaur_tex")
     .set(Texture2D{LoadTexture("assets/minotaur.png")});
+  ecs.entity("horror_monster")
+    .set(Texture2D{LoadTexture("assets/horror_monster.png")});
 
   ecs.observer<Texture2D>()
     .event(flecs::OnRemove)
@@ -339,7 +355,11 @@ void init_roguelike(flecs::world &ecs)
   //create_hive_monster(create_monster(ecs, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
   //create_hive(create_player_fleer(create_monster(ecs, Color{0, 255, 0, 255}, "minotaur_tex")));
 
-  create_archer(create_monster(ecs, Color{ 0x11, 0x11, 0x11, 0xff }, "minotaur_tex"));
+  if (!(archer_enabled || research_enabled))
+    create_player_approacher(create_monster(ecs, Color{ 0xff, 0xff, 0xff, 0xff }, "horror_monster"));
+
+  if (archer_enabled)
+    create_archer(create_monster(ecs, Color{ 0x11, 0x11, 0x11, 0xff }, "minotaur_tex"));
 
   create_player(ecs, "swordsman_tex");
 
@@ -351,15 +371,15 @@ void init_roguelike(flecs::world &ecs)
 void init_dungeon(flecs::world &ecs, char *tiles, size_t w, size_t h)
 {
   flecs::entity wallTex = ecs.entity("wall_tex")
-    .set(Texture2D{LoadTexture("assets/wall.png")});
+    .set(Texture2D{LoadTexture("assets/wall_resize.png")});
   flecs::entity floorTex = ecs.entity("floor_tex")
-    .set(Texture2D{LoadTexture("assets/floor.png")});
+    .set(Texture2D{LoadTexture("assets/floor_resize.png")});
 
   std::vector<char> dungeonData;
   std::vector<bool> researchedMap;
   dungeonData.resize(w * h);
   researchedMap.resize(w * h);
-  if (!research_enabled)
+  if (!(research_enabled || horror_research_enabled))
     std::fill(researchedMap.begin(), researchedMap.end(), true);
   for (size_t y = 0; y < h; ++y)
     for (size_t x = 0; x < w; ++x)
@@ -593,36 +613,66 @@ void process_turn(flecs::world &ecs)
     process_actions(ecs);
 
     std::vector<float> approachMap;
-    dmaps::gen_player_approach_map(ecs, approachMap, {1.f, true});
+    if (draw_function_example)
+    {
+      dmaps::gen_player_approach_map(ecs, approachMap, { 2.f, true });
+      ecs.entity("approach_map")
+        .add<VisualiseMap>();
+    }
+    else
+      dmaps::gen_player_approach_map(ecs, approachMap, { 1.f, true });
+
     ecs.entity("approach_map")
-      .set(DijkstraMapData{approachMap});
+      .set(DijkstraMapData{ approachMap });
+    
+    if (!research_enabled)
+    { 
+      std::vector<float> fleeMap;
+      dmaps::gen_player_flee_map(ecs, fleeMap, { 1.f, true });
+      ecs.entity("flee_map")
+        .set(DijkstraMapData{ fleeMap });
 
-    std::vector<float> fleeMap;
-    dmaps::gen_player_flee_map(ecs, fleeMap, { 1.f, true });
-    ecs.entity("flee_map")
-      .set(DijkstraMapData{fleeMap});
+      std::vector<float> hiveMap;
+      dmaps::gen_hive_pack_map(ecs, hiveMap, { 1.f, true });
+      ecs.entity("hive_map")
+        .set(DijkstraMapData{ hiveMap });
 
-    std::vector<float> hiveMap;
-    dmaps::gen_hive_pack_map(ecs, hiveMap, { 1.f, true });
-    ecs.entity("hive_map")
-      .set(DijkstraMapData{hiveMap});
+      //ecs.entity("flee_map").add<VisualiseMap>();
+      ecs.entity("hive_follower_sum")
+        .set(DmapWeights{ {{"hive_map", {1.f, 1.f}}, {"approach_map", {1.8f, 0.8f}}} });
+    }
+     
+    if (archer_enabled)
+    {
+      std::vector<float> archerMap;
+      dmaps::gen_archer_map(ecs, archerMap, { 1.f, true });
+      ecs.entity("archer_map")
+        .set(DijkstraMapData{archerMap})
+        .add<VisualiseMap>();
+    }
 
-    //ecs.entity("flee_map").add<VisualiseMap>();
-    ecs.entity("hive_follower_sum")
-      .set(DmapWeights{{{"hive_map", {1.f, 1.f}}, {"approach_map", {1.8f, 0.8f}}}});
-      
-    std::vector<float> archerMap;
-    dmaps::gen_archer_map(ecs, archerMap, {1.f, true});
-    ecs.entity("archer_map")
-      .set(DijkstraMapData{archerMap})
-      .add<VisualiseMap>();
+    if (research_enabled || horror_research_enabled)
+    {
+      std::vector<float> researchMap;
+      dmaps::gen_research_map(ecs, researchMap, { 1.f, true });
+      ecs.entity("research_map")
+        .set(DijkstraMapData{ researchMap });
+      if (research_enabled)
+        ecs.entity("research_map").add<VisualiseMap>();
+    }
 
-    std::vector<float> researchMap;
-    dmaps::gen_research_map(ecs, researchMap, { 1.f, true });
-    ecs.entity("research_map")
-      .set(DijkstraMapData{researchMap});
-    if (research_enabled)
-      ecs.entity("research_map").add<VisualiseMap>();
+    if (horror_research_enabled)
+    {
+      std::vector<float> fleeFromMonsterMap;
+      dmaps::gen_flee_from_monster_map(ecs, fleeFromMonsterMap, { 1.f, true });
+      ecs.entity("flee_from_monster_map")
+        .set(DijkstraMapData{ fleeFromMonsterMap });
+      //ecs.entity("flee_from_monster_map").add<VisualiseMap>();
+
+      ecs.entity("research_map_sum")
+        .set(DmapWeights{ {{"research_map", {1.0f, 1.0f}}, {"flee_from_monster_map", {2.5f, 0.9f}}} })
+        .add<VisualiseMap>();
+    }
   }
 }
 
