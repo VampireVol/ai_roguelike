@@ -56,3 +56,15 @@ bool dungeon::is_tile_reahable(flecs::world &ecs, Position from, Position to)
   return reachable;
 }
 
+Position dungeon::get_closer_tile(Position from, Position to)
+{
+  if (dist_sq(from, to) > 0.f)
+  {
+    const Position delta = from - to;
+    if (abs(delta.x) > abs(delta.y))
+      from.x += delta.x > 0 ? -1 : 1;
+    else
+      from.y += delta.y > 0 ? -1 : 1;
+  }
+  return from;
+}

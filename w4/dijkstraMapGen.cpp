@@ -177,28 +177,24 @@ void dmaps::gen_archer_map(flecs::world &ecs, std::vector<float> &map, const Dma
     init_tiles(map, dd);
     query_player_position(ecs, [&](const Position &pos, const IsPlayer)
     {
-      bool reachable = false;
-      for (int r = dungeon::rangeDistance; r > 0 && !reachable; --r)
+      int i, j;
+      for (i = dungeon::rangeDistance, j = 0; i > 0; --i, ++j)
       {
-        int i, j;
-        for (i = r, j = 0; i > 0; --i, ++j)
+        std::vector<Position> checkPositions
         {
-          std::vector<Position> checkPositions 
+          { pos.x + i, pos.y + j },
+          { pos.x - j, pos.y + i },
+          { pos.x - i, pos.y - j },
+          { pos.x + j, pos.y - i }
+        };
+        for (auto checkPosition : checkPositions)
+        {
+          while (!(dungeon::is_tile_walkable(ecs, checkPosition) &&
+                   dungeon::is_tile_reahable(ecs, checkPosition, pos)))
           {
-            { pos.x + i, pos.y + j },
-            { pos.x - j, pos.y + i },
-            { pos.x - i, pos.y - j },
-            { pos.x + j, pos.y - i }
-          };
-          for (const auto checkPosition : checkPositions)
-          {
-            if (dungeon::is_tile_walkable(ecs, checkPosition) &&
-                dungeon::is_tile_reahable(ecs, checkPosition, pos))
-            {
-              map[checkPosition.y * dd.width + checkPosition.x] = 0.f;
-              reachable = true;
-            }
+            checkPosition = dungeon::get_closer_tile(checkPosition, pos);
           }
+          map[checkPosition.y * dd.width + checkPosition.x] = 0.f;
         }
       }
     });
