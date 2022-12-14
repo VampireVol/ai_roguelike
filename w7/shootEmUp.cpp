@@ -112,8 +112,10 @@ static void register_roguelike_systems(flecs::world &ecs)
             }
           }
         }
+        int portalIdx = -1;
         for (const PathPortal &portal : dp.portals)
         {
+          ++portalIdx;
           Rectangle rect{portal.startX * tile_size, portal.startY * tile_size,
                          (portal.endX - portal.startX + 1) * tile_size,
                          (portal.endY - portal.startY + 1) * tile_size};
@@ -129,12 +131,19 @@ static void register_roguelike_systems(flecs::world &ecs)
             Vector2 toCenter{(endPortal.startX + endPortal.endX + 1) * tile_size * 0.5f,
                              (endPortal.startY + endPortal.endY + 1) * tile_size * 0.5f};
             DrawLineEx(fromCenter, toCenter, 1.f, WHITE);
+            DrawText(TextFormat("%d", portalIdx),
+              (fromCenter.x),
+              (fromCenter.y),
+              28, BLACK);
             DrawText(TextFormat("%d", int(conn.score)),
                      (fromCenter.x + toCenter.x) * 0.5f,
                      (fromCenter.y + toCenter.y) * 0.5f,
                      16, WHITE);
           }
         }
+        Vector2 tilePos { ((int)mousePosition.x / 64) * 64.0f, ((int)mousePosition.y / 64) * 64.0f };
+        Rectangle targetRect { tilePos.x, tilePos.y, tile_size, tile_size };
+        DrawRectangleLinesEx(targetRect, 5, RED);
       });
     });
   steer::register_systems(ecs);

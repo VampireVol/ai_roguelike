@@ -1,6 +1,5 @@
 #include "pathfinder.h"
 #include "dungeonUtils.h"
-#include "math.h"
 #include <algorithm>
 
 float heuristic(IVec2 lhs, IVec2 rhs)
@@ -26,7 +25,35 @@ static std::vector<IVec2> reconstruct_path(std::vector<IVec2> prev, IVec2 to, si
   return res;
 }
 
-static std::vector<IVec2> find_path_a_star(const DungeonData &dd, IVec2 from, IVec2 to,
+static std::vector<PortalConnection> reconstruct_path(const DungeonPortals &dp, std::vector<size_t> prev)
+{
+  std::vector<PortalConnection> res;
+  size_t curPos = dp.portals.size();
+  while (prev[curPos] != (size_t)-1)
+  {
+    size_t nextPos = prev[curPos];
+    if (nextPos == dp.portals.size() + 1)
+      std::swap(nextPos, curPos);
+    for (const auto pc : dp.portals[nextPos].conns)
+    {
+      if (pc.connIdx == curPos)
+      {
+        if (curPos == dp.portals.size() + 1)
+          res.insert(res.begin(), {nextPos, pc.score});
+        else
+          res.insert(res.begin(), pc);
+        break;
+      }
+    }
+    if (curPos == dp.portals.size() + 1)
+      std::swap(nextPos, curPos);
+    curPos = nextPos;
+    //res.insert(res.begin(), dp.portals);
+  }
+  return res;
+}
+
+std::vector<IVec2> find_path_a_star(const DungeonData &dd, IVec2 from, IVec2 to,
                                            IVec2 lim_min, IVec2 lim_max)
 {
   if (from.x < 0 || from.y < 0 || from.x >= int(dd.width) || from.y >= int(dd.height))
@@ -102,7 +129,7 @@ void prebuild_map(flecs::world &ecs)
 {
   auto mapQuery = ecs.query<const DungeonData>();
 
-  constexpr size_t splitTiles = 10;
+  size_t splitTiles = pathfinder::splitTiles;
   ecs.defer([&]()
   {
     mapQuery.each([&](flecs::entity e, const DungeonData &dd)
@@ -237,5 +264,128 @@ void prebuild_map(flecs::world &ecs)
       e.set(DungeonPortals{splitTiles, portals, tilePortalsIndices});
     });
   });
+}
+
+size_t find_dist_to_protal(const DungeonData &dd, const PathPortal &portal, IVec2 p)
+{
+  size_t out = 0xFFFFFF;
+  size_t splitTiles = pathfinder::splitTiles;
+  size_t tileIdx = coord_to_tile_idx(p.x, p.y, dd.width);
+  size_t tilePerRow = dd.width / splitTiles;
+  size_t row = tileIdx / tilePerRow;
+  size_t col = tileIdx % tilePerRow;
+  IVec2 limMin{ int((col + 0) * splitTiles), int((row + 0) * splitTiles) };
+  IVec2 limMax{ int((col + 1) * splitTiles), int((row + 1) * splitTiles) };
+  for (size_t startX = std::max(portal.startX, size_t(limMin.x));
+              startX <= std::min(portal.endX, size_t(limMax.x - 1)); ++startX)
+    for (size_t startY = std::max(portal.startY, size_t(limMin.y));
+                startY <= std::min(portal.endY, size_t(limMax.y - 1)); ++startY)
+    {
+      IVec2 toPortal{ int(startX), int(startY) };
+      std::vector<IVec2> path = find_path_a_star(dd, p, toPortal, limMin, limMax);
+      if (path.empty() && toPortal != p)
+      {
+        break;
+      }
+      out = std::min(out, path.size());
+    }
+  return out;
+}
+
+//Use copy DungeonPortals for modification
+std::vector<PortalConnection> find_path_a_star_tiled(const DungeonData &dd, DungeonPortals dp, IVec2 from, IVec2 to)
+{
+  if (from.x < 0 || from.y < 0 || from.x >= int(dd.width) || from.y >= int(dd.height))
+    return std::vector<PortalConnection>();
+  size_t inpSize = dp.portals.size() + 2;
+
+  size_t toIdx = dp.portals.size();
+  size_t fromIdx = dp.portals.size() + 1;
+
+  std::vector<float> g(inpSize, std::numeric_limits<float>::max());
+  std::vector<float> f(inpSize, std::numeric_limits<float>::max());
+  std::vector<size_t> prev(inpSize, -1);
+
+  g[fromIdx] = 0;
+  f[fromIdx] = heuristic(from, to);
+
+  std::vector<size_t> openList;
+  std::vector<size_t> closedList = { fromIdx };
+
+  size_t fromTileIdx = coord_to_tile_idx(from.x, from.y, dd.width);
+  for (const int idx : dp.tilePortalsIndices[fromTileIdx])
+  {
+    PathPortal &portal = dp.portals[idx];
+    size_t gScore = find_dist_to_protal(dd, portal, from);
+    IVec2 portalPos = { (portal.startX + portal.endX + 1) * 0.5f,
+                        (portal.startY + portal.endY + 1) * 0.5f };
+    prev[idx] = fromIdx;
+    g[idx] = gScore;
+    f[idx] = gScore + heuristic(portalPos, to);
+    openList.emplace_back(idx);
+    portal.conns.push_back({ fromIdx, (float)gScore });
+  }
+
+  size_t toTileIdx = coord_to_tile_idx(to.x, to.y, dd.width);
+  for (const int idx : dp.tilePortalsIndices[toTileIdx])
+  {
+    PathPortal &portal = dp.portals[idx];
+    float dist = find_dist_to_protal(dd, portal, to);
+    portal.conns.push_back({ toIdx, dist });
+  }
+
+  while (!openList.empty())
+  {
+    size_t bestIdx = 0;
+    float bestScore = f[openList[0]];
+    for (size_t i = 1; i < openList.size(); ++i)
+    {
+      float score = f[openList[i]];
+      if (score < bestScore)
+      {
+        bestIdx = i;
+        bestScore = score;
+      }
+    }
+    if (openList[bestIdx] == toIdx)
+      return reconstruct_path(dp, prev);
+    size_t curPos = openList[bestIdx];
+    openList.erase(openList.begin() + bestIdx);
+    if (std::find(closedList.begin(), closedList.end(), curPos) != closedList.end())
+      continue;
+    closedList.emplace_back(curPos);
+
+    auto checkNeighbour = [&](const PortalConnection &pc)
+    {
+      float gScore = g[curPos] + pc.score;
+      if (gScore < g[pc.connIdx])
+      {
+        IVec2 portalPos;
+        if (pc.connIdx != dp.portals.size())
+        {
+          const PathPortal &portal = dp.portals[pc.connIdx];
+          portalPos.x = (portal.startX + portal.endX + 1) * 0.5f;
+          portalPos.y = (portal.startY + portal.endY + 1) * 0.5f;
+        }
+        else
+        {
+          portalPos = to;
+        }
+        
+        prev[pc.connIdx] = curPos;
+        g[pc.connIdx] = gScore;
+        f[pc.connIdx] = gScore + heuristic(portalPos, to);
+      }
+      bool found = std::find(openList.begin(), openList.end(), pc.connIdx) != openList.end();
+      if (!found)
+        openList.emplace_back(pc.connIdx);
+    };
+
+    const auto &curPortal = dp.portals[curPos];
+    for (const auto &pc : curPortal.conns)
+    {
+      checkNeighbour(pc);
+    }
+  }
 }
 
